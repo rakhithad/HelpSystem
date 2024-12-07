@@ -4,15 +4,20 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 require('dotenv').config();
 const Counter = require('../models/counter');
+const authenticateToken = require('../middleware/authenticateToken');
 
 
 const router = express.Router();
 
 // Register route
 router.post('/register', async (req, res) => {
-    const { username, password, role = 'customer', firstName, lastName, phoneNumber, location } = req.body;
+    const { username, password, firstName, lastName, phoneNumber, location, role } = req.body;
 
     try {
+
+        const existingUser = await User.findOne({ username });
+        if (existingUser) return res.status(400).json({ message: 'Username already taken' });
+
         // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -34,7 +39,7 @@ router.post('/register', async (req, res) => {
             uid,
             username,
             password: hashedPassword,
-            role,
+            role: role || 'customer',
             firstName,
             lastName,
             phoneNumber,
@@ -69,11 +74,21 @@ router.post('/login', async (req, res) => {
         console.log('User:', user);
         console.log('UID:', user.uid); 
         
-        res.json({ token, uid: user.uid });
+        res.json({ token, uid: user.uid, role: user.role });
 
     } catch (error) {
         console.error(error);  // Log any error
         res.status(400).send('Error logging in');
+    }
+});
+
+router.get('/support-engineers', authenticateToken, async (req, res) => {
+    try {
+        const supportEngineers = await User.find({ role: 'support_engineer' }, 'firstName uid');
+        res.status(200).json(supportEngineers);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to fetch support engineers' });
     }
 });
 
