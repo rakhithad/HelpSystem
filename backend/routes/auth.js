@@ -6,7 +6,6 @@ require('dotenv').config();
 const Counter = require('../models/counter');
 const authenticateToken = require('../middleware/authenticateToken');
 
-
 const router = express.Router();
 
 // Register route
@@ -89,6 +88,81 @@ router.get('/support-engineers', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Failed to fetch support engineers' });
+    }
+});
+
+
+// Fetch all users (Admin only)
+router.get('/users', authenticateToken, async (req, res) => {
+    try {
+        // Ensure only admins can fetch users
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+        const users = await User.find({}, '-password'); // Exclude passwords
+        res.status(200).json(users);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch users' });
+    }
+});
+
+// routes/userRoutes.js
+router.put('/users/:id', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        const { id } = req.params;
+        const { firstName, lastName, role, phoneNumber, location } = req.body;
+
+        const updatedUser = await User.findByIdAndUpdate(
+            id,
+            { firstName, lastName, role, phoneNumber, location },
+            { new: true } // Return the updated document
+        );
+
+        if (!updatedUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.status(200).json(updatedUser);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to update user', error });
+    }
+});
+
+
+
+
+// Get logged-in user details
+router.get('/account', authenticateToken, async (req, res) => {
+    try {
+        const user = await User.findOne({ uid: req.user.uid });
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        res.status(200).json(user);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to fetch user details' });
+    }
+});
+
+// Update logged-in user details
+router.put('/account', authenticateToken, async (req, res) => {
+    try {
+        const updates = req.body; // Get updated fields from the request
+        const user = await User.findOneAndUpdate(
+            { uid: req.user.uid },
+            { $set: updates },
+            { new: true } // Return the updated document
+        );
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        res.status(200).json(user);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to update user details' });
     }
 });
 

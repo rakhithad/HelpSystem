@@ -18,7 +18,7 @@ const Login = () => {
 
             alert('Login successful: ' + response.data.token);
 
-            navigate('/create-ticket');
+            navigate('/dashboard');
         } catch (error) {
             // Check the error response
             if (error.response) {
