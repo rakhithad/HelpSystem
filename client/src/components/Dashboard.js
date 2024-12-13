@@ -11,11 +11,17 @@ const Dashboard = () => {
     const [selectedTickets, setSelectedTickets] = useState([]);
     const [selectedType, setSelectedType] = useState('');
 
-    // Fetch ticket counts
+    // Get role and uid from local storage
+    const role = localStorage.getItem('role');
+    const uid = localStorage.getItem('uid');
+
+    // Fetch ticket counts based on role
     useEffect(() => {
         const fetchTicketCounts = async () => {
             try {
-                const response = await axios.get('http://localhost:5000/api/tickets/ticket-counts');
+                const response = await axios.get('http://localhost:5000/api/tickets/ticket-counts', {
+                    headers: { role, uid }
+                });
                 setTicketCounts(response.data);
             } catch (error) {
                 console.error('Error fetching ticket counts:', error);
@@ -23,12 +29,17 @@ const Dashboard = () => {
         };
 
         fetchTicketCounts();
-    }, []);
+    }, [role, uid]);
 
-    // Fetch tickets by type
+    // Fetch tickets by type based on role
     const fetchTicketsByType = async (type) => {
         try {
-            const response = await axios.get(`http://localhost:5000/api/tickets/tickets-by-status?type=${type}`);
+            const response = await axios.get(
+                `http://localhost:5000/api/tickets/tickets-by-status?type=${type}`,
+                {
+                    headers: { role, uid }
+                }
+            );
             setSelectedTickets(response.data);
             setSelectedType(type);
         } catch (error) {
@@ -70,38 +81,39 @@ const Dashboard = () => {
                 </div>
             </div>
 
-            {/* Ticket List */}
-            {selectedTickets.length > 0 && (
-                <div className="ticket-list mt-4 p-4 bg-gray-100 rounded shadow">
-                    <h3 className="text-xl font-semibold mb-2 capitalize">
-                        {selectedType} Tickets
-                    </h3>
-                    <table className="table-auto w-full border-collapse border border-gray-300">
-                        <thead>
-                            <tr className="bg-gray-200">
-                                <th className="border border-gray-300 px-4 py-2">TID</th>
-                                <th className="border border-gray-300 px-4 py-2">Title</th>
-                                <th className="border border-gray-300 px-4 py-2">Description</th>
-                                <th className="border border-gray-300 px-4 py-2">Priority</th>
-                                <th className="border border-gray-300 px-4 py-2">Status</th>
-                                <th className="border border-gray-300 px-4 py-2">Assigned Engineer</th>
+            {selectedTickets.length > 0 ? (
+            <>
+                <h3 className="text-xl font-semibold mb-2 capitalize">
+                    {selectedType} Tickets
+                </h3>
+                <table className="table-auto w-full border-collapse border border-gray-300">
+                    <thead>
+                        <tr className="bg-gray-200">
+                            <th className="border border-gray-300 px-4 py-2">TID</th>
+                            <th className="border border-gray-300 px-4 py-2">Title</th>
+                            <th className="border border-gray-300 px-4 py-2">Description</th>
+                            <th className="border border-gray-300 px-4 py-2">Priority</th>
+                            <th className="border border-gray-300 px-4 py-2">Status</th>
+                            <th className="border border-gray-300 px-4 py-2">Assigned Engineer</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {selectedTickets.map((ticket) => (
+                            <tr key={ticket.tid}>
+                                <td className="border border-gray-300 px-4 py-2">{ticket.tid}</td>
+                                <td className="border border-gray-300 px-4 py-2">{ticket.title}</td>
+                                <td className="border border-gray-300 px-4 py-2">{ticket.description}</td>
+                                <td className="border border-gray-300 px-4 py-2">{ticket.priority}</td>
+                                <td className="border border-gray-300 px-4 py-2">{ticket.status}</td>
+                                <td className="border border-gray-300 px-4 py-2">{ticket.assignedSupportEngineer}</td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            {selectedTickets.map((ticket) => (
-                                <tr key={ticket.tid}>
-                                    <td className="border border-gray-300 px-4 py-2">{ticket.tid}</td>
-                                    <td className="border border-gray-300 px-4 py-2">{ticket.title}</td>
-                                    <td className="border border-gray-300 px-4 py-2">{ticket.description}</td>
-                                    <td className="border border-gray-300 px-4 py-2">{ticket.priority}</td>
-                                    <td className="border border-gray-300 px-4 py-2">{ticket.status}</td>
-                                    <td className="border border-gray-300 px-4 py-2">{ticket.assignedSupportEngineer}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+                        ))}
+                    </tbody>
+                </table>
+            </>
+        ) : (
+            <p>No tickets found for {selectedType}.</p>
+        )}
         </div>
     );
 };

@@ -101,48 +101,61 @@ router.put('/update-ticket/:id', authenticateToken, async (req, res) => {
 });
 
 
-// API to get ticket counts
 router.get('/ticket-counts', async (req, res) => {
-    try {
-        const openTickets = await Ticket.countDocuments({ status: 'not started' });
-        const pendingTickets = await Ticket.countDocuments({ status: 'in progress' });
-        const solvedTickets = await Ticket.countDocuments({ status: 'done' });
-        const unassignedTickets = await Ticket.countDocuments({ assignedSupportEngineer: 'Not Assigned' });
+    const { role, uid } = req.headers;
 
-        res.status(200).json({
-            openTickets,
-            pendingTickets,
-            solvedTickets,
-            unassignedTickets
-        });
+    try {
+        let query = {};
+        if (role === 'customer') {
+            query = { uid: uid };
+        } else if (role === 'support-engineer') {
+            query = { assignedSupportEngineer: uid };
+        }
+
+        const openTickets = await Ticket.countDocuments({ ...query, status: 'not started' });
+        const pendingTickets = await Ticket.countDocuments({ ...query, status: 'in progress' });
+        const solvedTickets = await Ticket.countDocuments({ ...query, status: 'done' });
+        const unassignedTickets = await Ticket.countDocuments({ ...query, assignedSupportEngineer: 'Not Assigned' });
+
+        res.status(200).json({ openTickets, pendingTickets, solvedTickets, unassignedTickets });
     } catch (error) {
         console.error('Error fetching ticket counts:', error);
         res.status(500).json({ message: 'Failed to fetch ticket counts' });
     }
 });
 
-router.get('/tickets-by-status', async (req, res) => {
-    try {
-        const { type } = req.query;
 
-        let filter = {};
-        if (type === 'open') {
-            filter.status = 'not started';
-        } else if (type === 'pending') {
-            filter.status = 'in progress';
-        } else if (type === 'solved') {
-            filter.status = 'done';
-        } else if (type === 'unassigned') {
-            filter.assignedSupportEngineer = 'Not Assigned';
+
+// API to fetch tickets by type
+router.get('/tickets-by-status', async (req, res) => {
+    const { type } = req.query;
+    const userRole = req.headers.role; // Get role from headers
+    const userId = req.headers.uid;   // Get UID from headers
+
+    let filter = {};
+
+    // Define filter based on ticket type
+    if (type === 'open') filter.status = 'not started';
+    if (type === 'pending') filter.status = 'in progress';
+    if (type === 'solved') filter.status = 'done';
+    if (type === 'unassigned') filter.assignedSupportEngineer = 'Not Assigned';
+
+    try {
+        // Additional filtering based on user role
+        if (userRole === 'customer') {
+            filter.uid = userId; // Filter tickets created by this user
+        } else if (userRole === 'supportEngineer') {
+            filter.assignedSupportEngineer = userId; // Filter tickets assigned to this user
         }
 
         const tickets = await Ticket.find(filter);
         res.status(200).json(tickets);
     } catch (error) {
         console.error('Error fetching tickets:', error);
-        res.status(500).json({ message: 'Failed to fetch tickets', error: error.message });
+        res.status(500).json({ message: 'Failed to fetch tickets' });
     }
 });
+
 
 
 module.exports = router;

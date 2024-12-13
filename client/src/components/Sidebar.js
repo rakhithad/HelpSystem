@@ -4,13 +4,20 @@ import { Link, useNavigate } from 'react-router-dom';
 const Sidebar = () => {
     const navigate = useNavigate();
     const role = localStorage.getItem('role'); // Get the user's role from localStorage
+    const username = localStorage.getItem('username'); // Get the username from localStorage
 
     // Logout function
     const handleLogout = () => {
         localStorage.removeItem('token'); // Clear the token from localStorage
         localStorage.removeItem('uid');  // Clear the uid
         localStorage.removeItem('role'); // Clear the role
+        localStorage.removeItem('username'); // Clear the username
         navigate('/login'); // Redirect to login page
+    };
+
+    // Handle click to redirect to the account page
+    const goToAccountPage = () => {
+        navigate('/account');
     };
 
     return (
@@ -23,6 +30,14 @@ const Sidebar = () => {
             {/* Navigation Links */}
             <nav className="flex-grow">
                 <ul className="mt-6 space-y-4 px-6">
+                <li>
+                        <Link 
+                            to="/create-ticket" 
+                            className="block py-2 px-4 rounded hover:bg-gray-700"
+                        >
+                            Create a ticket
+                        </Link>
+                    </li>
                     <li>
                         <Link 
                             to="/dashboard" 
@@ -39,14 +54,7 @@ const Sidebar = () => {
                             View Tickets
                         </Link>
                     </li>
-                    <li>
-                        <Link 
-                            to="/account" 
-                            className="block py-2 px-4 rounded hover:bg-gray-700"
-                        >
-                            Account
-                        </Link>
-                    </li>
+                
                     {/* Show Admin Dashboard link only for admin */}
                     {role === 'admin' && (
                         <li>
@@ -60,6 +68,18 @@ const Sidebar = () => {
                     )}
                 </ul>
             </nav>
+
+            {/* Username Display */}
+            {username && (
+                <div className="flex flex-col items-center mb-4">
+                    <button
+                        onClick={goToAccountPage}
+                        className="text-center text-white py-2 px-4 bg-gray-700 hover:bg-gray-600 rounded"
+                    >
+                        {username}
+                    </button>
+                </div>
+            )}
 
             {/* Logout Button */}
             <div className="px-6 mb-4">
