@@ -4,18 +4,25 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 require('dotenv').config();
 const Counter = require('../models/counter');
+const Company = require('../models/Company');
 const authenticateToken = require('../middleware/authenticateToken');
 
 const router = express.Router();
 
 // Register route
 router.post('/register', async (req, res) => {
-    const { username, password, firstName, lastName, phoneNumber, location, role } = req.body;
+    const { username, password, firstName, lastName, phoneNumber, location, role, companyId } = req.body;
 
     try {
 
         const existingUser = await User.findOne({ username });
         if (existingUser) return res.status(400).json({ message: 'Username already taken' });
+
+        // Check if the provided company exists
+        const existingCompany = await Company.findOne({ companyId });
+        if (!existingCompany) {
+            return res.status(400).json({ message: 'Selected company does not exist' });
+        }
 
         // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -33,6 +40,14 @@ router.post('/register', async (req, res) => {
         
         const uid = `UID-${counter.count}`;
 
+        // Validate companyId for customers
+        if (role === 'customer') {
+            const company = await Company.findOne({ companyId });
+            if (!company) {
+                return res.status(400).json({ message: 'Invalid companyId. Please create a company first.' });
+            }
+        }
+
         // Create and save the new user
         const newUser = new User({
             uid,
@@ -42,7 +57,8 @@ router.post('/register', async (req, res) => {
             firstName,
             lastName,
             phoneNumber,
-            location
+            location,
+            companyId
         });
 
         await newUser.save();
@@ -163,6 +179,50 @@ router.put('/account', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Failed to update user details' });
+    }
+});
+
+
+router.post('/create-company', async (req, res) => {
+    const { name, address, phoneNumber } = req.body;
+
+    try {
+        // Generate a unique companyId
+        const counter = await Counter.findOneAndUpdate(
+            { name: 'company_id' },
+            { $inc: { count: 1 } },
+            { new: true, upsert: true }
+        );
+
+        if (!counter || !counter.count) {
+            throw new Error("Counter not found or failed to increment");
+        }
+
+        const companyId = `COMP-${counter.count}`;
+
+        // Create and save the new company
+        const newCompany = new Company({
+            companyId,
+            name,
+            address,
+            phoneNumber
+        });
+
+        await newCompany.save();
+        res.status(201).json({ message: 'Company created successfully', companyId });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error creating company' });
+    }
+});
+
+router.get('/companies', async (req, res) => {
+    try {
+        const companies = await Company.find();
+        res.status(200).json(companies);
+    } catch (error) {
+        console.error('Error fetching companies:', error);
+        res.status(500).json({ message: 'Error fetching companies' });
     }
 });
 

@@ -9,6 +9,7 @@ import Sidebar from './components/Sidebar';
 import AdminDashboard from './components/AdminDashboard';
 import ManageUsers from './components/ManageUsers';
 import Account from './components/Account';
+import CreateCompany from './components/CreateCompany';
 
 const App = () => {
     const isAuthenticated = () => {
@@ -48,6 +49,7 @@ const App = () => {
                         <Route path="/admin-dashboard" element={<AdminDashboard />} />
                         <Route path="/manage-users" element={<ManageUsers />} />
                         <Route path="/account" element={<Account />} />
+                        <Route path="/create-company" element={<CreateCompany />} />
                     </Routes>
                 </div>
             </div>
