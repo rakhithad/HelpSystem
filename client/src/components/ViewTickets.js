@@ -4,26 +4,35 @@ import axios from 'axios';
 const ViewTickets = () => {
     const [tickets, setTickets] = useState([]);
     const [supportEngineers, setSupportEngineers] = useState([]);
+    const [filteredTickets, setFilteredTickets] = useState([]); // Tickets after filtering
+    const [selectedStatus, setSelectedStatus] = useState(''); // Selected status for filtering
     const [error, setError] = useState(null);
 
-    // Fetch tickets and support engineers on component mount
+    // Retrieve the role from localStorage
+    const userRole = localStorage.getItem('role'); // Assuming 'role' is stored in localStorage
+
     useEffect(() => {
         const fetchData = async () => {
             try {
                 const token = localStorage.getItem('token');
 
-                // Fetch tickets
+                // Fetch tickets based on the role
                 const ticketsResponse = await axios.get('http://localhost:5000/api/tickets/view-tickets', {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { Authorization: `Bearer ${token}` },
                 });
                 setTickets(ticketsResponse.data);
+                setFilteredTickets(ticketsResponse.data);
 
-                // Fetch support engineers
-                const engineersResponse = await axios.get('http://localhost:5000/api/auth/support-engineers', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                console.log('Fetched Engineers:', engineersResponse.data);
-                setSupportEngineers(engineersResponse.data);
+                // Fetch support engineers only if the user is not a customer
+                if (userRole !== 'customer') {
+                    const engineersResponse = await axios.get(
+                        'http://localhost:5000/api/auth/support-engineers',
+                        {
+                            headers: { Authorization: `Bearer ${token}` },
+                        }
+                    );
+                    setSupportEngineers(engineersResponse.data);
+                }
             } catch (err) {
                 setError('Failed to fetch data.');
                 console.error(err);
@@ -31,20 +40,25 @@ const ViewTickets = () => {
         };
 
         fetchData();
-    }, []);
+    }, [userRole]);
 
-    // Handle updating a ticket
+    // Handle ticket updates (status, priority, or assigned engineer)
     const handleUpdateTicket = async (ticketId, updates) => {
         try {
             const token = localStorage.getItem('token');
             const response = await axios.put(
                 `http://localhost:5000/api/tickets/update-ticket/${ticketId}`,
                 updates,
-                { headers: { 'Authorization': `Bearer ${token}` } }
+                { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            // Update ticket in state
+            // Update the ticket in the local state
             setTickets((prevTickets) =>
+                prevTickets.map((ticket) =>
+                    ticket._id === ticketId ? response.data : ticket
+                )
+            );
+            setFilteredTickets((prevTickets) =>
                 prevTickets.map((ticket) =>
                     ticket._id === ticketId ? response.data : ticket
                 )
@@ -56,62 +70,86 @@ const ViewTickets = () => {
         }
     };
 
+    // Filter tickets based on selected status
+    useEffect(() => {
+        const filtered = selectedStatus
+            ? tickets.filter((ticket) => ticket.status === selectedStatus)
+            : tickets;
+        setFilteredTickets(filtered);
+    }, [selectedStatus, tickets]);
+
     if (error) return <div>{error}</div>;
 
     return (
         <div>
             <h1>View Tickets</h1>
+
+            {/* Filters */}
+            <div>
+                <label>Filter by Status: </label>
+                <select
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value)}
+                >
+                    <option value="">All Statuses</option>
+                    <option value="not started">Not Started</option>
+                    <option value="in progress">In Progress</option>
+                    <option value="stuck">Stuck</option>
+                    <option value="done">Done</option>
+                </select>
+            </div>
+
+            {/* Tickets List */}
             <ul>
-                {tickets.length === 0 ? (
+                {filteredTickets.length === 0 ? (
                     <li>No tickets available</li>
                 ) : (
-                    tickets.map((ticket) => (
+                    filteredTickets.map((ticket) => (
                         <li key={ticket._id}>
-                            <strong>{ticket.title}</strong> - {ticket.status} - Priority: {ticket.priority} <br />
-
-                            {/* Admin Controls */}
-                            <div>
-                                <label>Status: </label>
-                                <select
-                                    value={ticket.status}
-                                    onChange={(e) =>
-                                        handleUpdateTicket(ticket._id, { status: e.target.value })
-                                    }
-                                >
-                                    <option value="not started">Not Started</option>
-                                    <option value="in progress">In Progress</option>
-                                    <option value="stuck">Stuck</option>
-                                    <option value="done">Done</option>
-                                </select>
-
-                                <label> Priority: </label>
-                                <input
-                                    type="number"
-                                    value={ticket.priority}
-                                    min="1"
-                                    max="5"
-                                    onChange={(e) =>
-                                        handleUpdateTicket(ticket._id, { priority: e.target.value })
-                                    }
-                                />
-
-                                <label> Assign to: </label>
-                                <select
-                                    value={ticket.assignedSupportEngineer || ''}
-                                    onChange={(e) =>
-                                        handleUpdateTicket(ticket._id, {
-                                            assignedSupportEngineer: e.target.value
-                                        })
-                                    }
-                                >
-                                    <option value="">Not Assigned</option>
-                                    {supportEngineers.map((engineer) => (
-                                        <option key={engineer.uid} value={`${engineer.uid}`}>
-                                            {engineer.firstName}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+                            <strong>{ticket.title}</strong> - {ticket.status} - Priority: {ticket.priority}
+                            <br />
+                            {userRole !== 'customer' && (
+                                <div>
+                                    <label>Status: </label>
+                                    <select
+                                        value={ticket.status}
+                                        onChange={(e) =>
+                                            handleUpdateTicket(ticket._id, { status: e.target.value })
+                                        }
+                                    >
+                                        <option value="not started">Not Started</option>
+                                        <option value="in progress">In Progress</option>
+                                        <option value="stuck">Stuck</option>
+                                        <option value="done">Done</option>
+                                    </select>
+                                    <label> Priority: </label>
+                                    <input
+                                        type="number"
+                                        value={ticket.priority}
+                                        min="1"
+                                        max="5"
+                                        onChange={(e) =>
+                                            handleUpdateTicket(ticket._id, { priority: e.target.value })
+                                        }
+                                    />
+                                    <label> Assign to: </label>
+                                    <select
+                                        value={ticket.assignedSupportEngineer || ''}
+                                        onChange={(e) =>
+                                            handleUpdateTicket(ticket._id, {
+                                                assignedSupportEngineer: e.target.value,
+                                            })
+                                        }
+                                    >
+                                        <option value="">Not Assigned</option>
+                                        {supportEngineers.map((engineer) => (
+                                            <option key={engineer.uid} value={`${engineer.uid}`}>
+                                                {engineer.firstName}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                         </li>
                     ))
                 )}
