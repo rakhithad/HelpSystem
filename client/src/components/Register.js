@@ -46,7 +46,7 @@ const Register = () => {
                 phoneNumber,
                 location,
                 role,
-                companyId: role === 'customer' ? companyId : undefined // Include companyId only for customers
+                ...(role === 'customer' && { companyId }) // Only include companyId for customers
             });
 
             alert('User registered successfully');
@@ -124,10 +124,12 @@ const Register = () => {
                 </select>
             )}
 
-            {/* Always show the "Create a Company" button */}
-            <button type="button" onClick={handleCreateCompany}>
-                No Companies Found? Create a New Company
-            </button>
+            {/* Show the "Create a Company" button only for customers */}
+            {role === 'customer' && (
+                <button type="button" onClick={handleCreateCompany}>
+                    No Companies Found? Create a New Company
+                </button>
+            )}
 
             <button type="submit">Register</button>
         </form>

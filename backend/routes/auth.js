@@ -18,11 +18,14 @@ router.post('/register', async (req, res) => {
         const existingUser = await User.findOne({ username });
         if (existingUser) return res.status(400).json({ message: 'Username already taken' });
 
-        // Check if the provided company exists
-        const existingCompany = await Company.findOne({ companyId });
-        if (!existingCompany) {
-            return res.status(400).json({ message: 'Selected company does not exist' });
+        if (role === 'customer') {
+            const company = await Company.findOne({ companyId });
+            if (!company) {
+                return res.status(400).json({ message: 'Invalid companyId. Please create a company first.' });
+            }
         }
+        console.log('Received companyId:', companyId);
+
 
         // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -101,6 +104,7 @@ router.get('/support-engineers', authenticateToken, async (req, res) => {
     try {
         const supportEngineers = await User.find({ role: 'support_engineer' }, 'firstName uid');
         res.status(200).json(supportEngineers);
+        console.log('Support Engineers:', supportEngineers);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Failed to fetch support engineers' });
