@@ -212,6 +212,38 @@ router.get('/generate',  async (req, res) => {
 });
 
 
+// Add review and rating to a ticket
+router.post('/review/:ticketId', authenticateToken, async (req, res) => {
+    const { ticketId } = req.params;
+    const { review, rating } = req.body;
+    const userId = req.user.uid; // Assuming you're using middleware to extract user info from the token
+
+    try {
+        // Find the ticket
+        const ticket = await Ticket.findOne({ _id: ticketId, uid: userId });
+
+        if (!ticket) {
+            return res.status(404).json({ message: 'Ticket not found or you are not authorized to review it' });
+        }
+
+        if (ticket.status !== 'done') {
+            return res.status(400).json({ message: 'Cannot review a ticket that is not completed' });
+        }
+
+        // Add the review and rating
+        ticket.review = review;
+        ticket.rating = rating;
+        await ticket.save();
+
+        res.json({ message: 'Review submitted successfully', ticket });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Failed to submit review' });
+    }
+});
+
+
+
 
 
 module.exports = router;

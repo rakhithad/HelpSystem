@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const ViewTickets = () => {
     const [tickets, setTickets] = useState([]);
@@ -7,6 +8,7 @@ const ViewTickets = () => {
     const [filteredTickets, setFilteredTickets] = useState([]); // Tickets after filtering
     const [selectedStatus, setSelectedStatus] = useState(''); // Selected status for filtering
     const [error, setError] = useState(null);
+    const navigate = useNavigate();
 
     // Retrieve the role from localStorage
     const userRole = localStorage.getItem('role'); // Assuming 'role' is stored in localStorage
@@ -148,6 +150,19 @@ const ViewTickets = () => {
                                             </option>
                                         ))}
                                     </select>
+                                </div>
+                            )}
+                            {userRole === 'customer' && ticket.status === 'done' && (
+                                <div>
+                                    {ticket.review ? (
+                                        <button disabled>Reviewed</button>
+                                    ) : (
+                                        <button
+                                            onClick={() => navigate(`/review-ticket/${ticket._id}`)}
+                                        >
+                                            Write Review
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </li>
