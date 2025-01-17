@@ -1,6 +1,6 @@
 const express = require('express');
 const Ticket = require('../models/Ticket');
-const authenticateToken = require('../middleware/authenticateToken');
+const { authenticateToken, isAdmin } = require('../middleware/authenticateToken');
 const Counter = require('../models/counter');
 
 const router = express.Router();
@@ -155,6 +155,62 @@ router.get('/tickets-by-status', async (req, res) => {
         res.status(500).json({ message: 'Failed to fetch tickets' });
     }
 });
+
+
+router.get('/generate',  async (req, res) => {
+    try {
+        // Total tickets
+        const totalTickets = await Ticket.countDocuments();
+        
+        // Tickets by company
+        const ticketsByCompany = await Ticket.aggregate([
+            { $group: { _id: '$account', count: { $sum: 1 } } } // Assuming `account` represents the company
+        ]);
+
+        // Tickets by customer
+        const ticketsByCustomer = await Ticket.aggregate([
+            { $group: { _id: '$uid', count: { $sum: 1 } } } // Assuming `uid` represents the customer ID
+        ]);
+
+        // Tickets created by month
+        const ticketsCreatedByMonth = await Ticket.aggregate([
+            {
+                $group: {
+                    _id: { $month: '$createdAt' }, // Group by month of creation
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { _id: 1 } } // Sort by month
+        ]);
+
+        // Tickets resolved by month
+        const ticketsResolvedByMonth = await Ticket.aggregate([
+            { $match: { status: 'done' } }, // Filter resolved tickets
+            {
+                $group: {
+                    _id: { $month: '$updatedAt' }, // Group by month of resolution
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { _id: 1 } } // Sort by month
+        ]);
+
+        // Build the report
+        const report = {
+            totalTickets,
+            ticketsByCompany,
+            ticketsByCustomer,
+            ticketsCreatedByMonth,
+            ticketsResolvedByMonth,
+        };
+
+        res.json(report);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Failed to generate report' });
+    }
+});
+
 
 
 

@@ -5,7 +5,7 @@ const User = require('../models/User');
 require('dotenv').config();
 const Counter = require('../models/counter');
 const Company = require('../models/Company');
-const authenticateToken = require('../middleware/authenticateToken');
+const { authenticateToken } = require('../middleware/authenticateToken');
 
 const router = express.Router();
 

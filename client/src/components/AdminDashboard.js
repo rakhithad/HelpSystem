@@ -22,10 +22,17 @@ const AdminDashboard = () => {
                 </button>
                 <button
                     className="w-full bg-gray-500 text-white p-4 rounded-md hover:bg-gray-600"
+                    onClick={() => navigate('/report')}
+                >
+                    Report
+                </button>
+                <button
+                    className="w-full bg-gray-500 text-white p-4 rounded-md hover:bg-gray-600"
                     onClick={() => navigate('/dashboard')}
                 >
                     Back to Dashboard
                 </button>
+
             </div>
         </div>
     );

@@ -10,6 +10,7 @@ import AdminDashboard from './components/AdminDashboard';
 import ManageUsers from './components/ManageUsers';
 import Account from './components/Account';
 import CreateCompany from './components/CreateCompany';
+import ReportPage from './components/ReportPage';
 
 const App = () => {
     const isAuthenticated = () => {
@@ -50,6 +51,7 @@ const App = () => {
                         <Route path="/manage-users" element={<ManageUsers />} />
                         <Route path="/account" element={<Account />} />
                         <Route path="/create-company" element={<CreateCompany />} />
+                        <Route path="/report" element={<ReportPage />} />
                     </Routes>
                 </div>
             </div>
