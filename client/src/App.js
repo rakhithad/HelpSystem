@@ -12,6 +12,9 @@ import Account from './components/Account';
 import CreateCompany from './components/CreateCompany';
 import ReportPage from './components/ReportPage';
 import ReviewTicketPage from './components/ReviewTicketPage';
+import ManageTickets from './components/ManageTickets';
+import HomePage from './components/HomePage';
+import ViewReviewsPage from './components/ViewReviewsPage';
 
 const App = () => {
     const isAuthenticated = () => {
@@ -19,7 +22,7 @@ const App = () => {
         return !!token; // Return true if token exists
     };
 
-    const ExcludeSidebarRoutes = ["/login", "/register"]; // Routes where sidebar should not appear
+    const ExcludeSidebarRoutes = ["/login", "/register", "/home"]; // Routes where sidebar should not appear
 
     const MainContent = () => {
         const location = useLocation(); // Get the current route
@@ -27,10 +30,10 @@ const App = () => {
         const showSidebar = !ExcludeSidebarRoutes.includes(location.pathname); // Determine if sidebar should be shown
 
         return (
-            <div className="flex">
+            <div>
                 {/* Conditionally render Sidebar */}
                 {showSidebar && <Sidebar />}
-                <div className="flex-grow p-6 bg-gray-100">
+                <div>
                     <Routes>
                         {/* Redirect to Dashboard or Login based on authentication */}
                         <Route
@@ -39,10 +42,11 @@ const App = () => {
                                 isAuthenticated() ? (
                                     <Navigate to="/dashboard" />
                                 ) : (
-                                    <Navigate to="/login" />
+                                    <Navigate to="/home" />
                                 )
                             }
                         />
+                        <Route path="/home" element={<HomePage />} />
                         <Route path="/register" element={<Register />} />
                         <Route path="/login" element={<Login />} />
                         <Route path="/create-ticket" element={<CreateTicket />} />
@@ -54,6 +58,9 @@ const App = () => {
                         <Route path="/create-company" element={<CreateCompany />} />
                         <Route path="/report" element={<ReportPage />} />
                         <Route path="/review-ticket/:ticketId" element={<ReviewTicketPage />} />   
+                        <Route path="/manage-tickets" element={<ManageTickets />} />
+                        <Route path="/view-reviews" element={<ViewReviewsPage />} />
+
                     </Routes>
                 </div>
             </div>

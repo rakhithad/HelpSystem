@@ -15,6 +15,12 @@ const AdminDashboard = () => {
                     Manage Users
                 </button>
                 <button
+                    className="w-full bg-blue-500 text-white p-4 rounded-md hover:bg-blue-600"
+                    onClick={() => navigate('/manage-tickets')}
+                >
+                    Manage Tickets
+                </button>
+                <button
                     className="w-full bg-green-500 text-white p-4 rounded-md hover:bg-green-600"
                     onClick={() => navigate('/register')}
                 >

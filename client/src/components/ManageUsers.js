@@ -12,7 +12,7 @@ const ManageUsers = () => {
             try {
                 const token = localStorage.getItem('token');
                 const response = await axios.get('http://localhost:5000/api/auth/users', {
-                    headers: { Authorization: `Bearer ${token}` }
+                    headers: { Authorization: `Bearer ${token}` },
                 });
                 setUsers(response.data);
             } catch (error) {
@@ -32,7 +32,7 @@ const ManageUsers = () => {
         try {
             const token = localStorage.getItem('token');
             await axios.put(`http://localhost:5000/api/auth/users/${editingUserId}`, editedUser, {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: { Authorization: `Bearer ${token}` },
             });
             setEditingUserId(null); // Exit edit mode
             const updatedUsers = users.map((user) =>
@@ -44,12 +44,30 @@ const ManageUsers = () => {
         }
     };
 
+    // Handle user delete
+    const handleDelete = async (userId) => {
+        try {
+            const token = localStorage.getItem('token');
+            await axios.delete(`http://localhost:5000/api/auth/users/${userId}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            // Update the local user state
+            setUsers(users.filter((user) => user._id !== userId));
+            alert('User deleted successfully');
+        } catch (error) {
+            console.error('Error deleting user:', error);
+            alert('Failed to delete user');
+        }
+    };
+
     return (
         <div className="p-6 bg-gray-100 min-h-screen">
             <h1 className="text-2xl font-bold mb-6">Manage Users</h1>
             <table className="w-full bg-white shadow-md rounded">
                 <thead>
                     <tr>
+                        <th className="border px-4 py-2">UID</th>
                         <th className="border px-4 py-2">Username</th>
                         <th className="border px-4 py-2">First Name</th>
                         <th className="border px-4 py-2">Last Name</th>
@@ -62,10 +80,8 @@ const ManageUsers = () => {
                 <tbody>
                     {users.map((user) => (
                         <tr key={user._id}>
-                            {/* Username is displayed but not editable */}
+                            <td className="border px-4 py-2">{user.uid}</td>
                             <td className="border px-4 py-2">{user.username}</td>
-                            
-                            {/* First Name (editable) */}
                             <td className="border px-4 py-2">
                                 {editingUserId === user._id ? (
                                     <input
@@ -79,8 +95,6 @@ const ManageUsers = () => {
                                     user.firstName
                                 )}
                             </td>
-                            
-                            {/* Last Name (editable) */}
                             <td className="border px-4 py-2">
                                 {editingUserId === user._id ? (
                                     <input
@@ -94,8 +108,6 @@ const ManageUsers = () => {
                                     user.lastName
                                 )}
                             </td>
-                            
-                            {/* Role (editable) */}
                             <td className="border px-4 py-2">
                                 {editingUserId === user._id ? (
                                     <select
@@ -112,8 +124,6 @@ const ManageUsers = () => {
                                     user.role
                                 )}
                             </td>
-                            
-                            {/* Phone (editable) */}
                             <td className="border px-4 py-2">
                                 {editingUserId === user._id ? (
                                     <input
@@ -127,8 +137,6 @@ const ManageUsers = () => {
                                     user.phoneNumber
                                 )}
                             </td>
-                            
-                            {/* Location (editable) */}
                             <td className="border px-4 py-2">
                                 {editingUserId === user._id ? (
                                     <input
@@ -142,8 +150,6 @@ const ManageUsers = () => {
                                     user.location
                                 )}
                             </td>
-                            
-                            {/* Actions */}
                             <td className="border px-4 py-2">
                                 {editingUserId === user._id ? (
                                     <button
@@ -160,6 +166,12 @@ const ManageUsers = () => {
                                         Edit
                                     </button>
                                 )}
+                                <button
+                                    className="bg-red-500 text-white p-2 rounded-md ml-2"
+                                    onClick={() => handleDelete(user._id)}
+                                >
+                                    Delete
+                                </button>
                             </td>
                         </tr>
                     ))}

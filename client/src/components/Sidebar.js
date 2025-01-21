@@ -1,3 +1,4 @@
+// Sidebar Component
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -21,7 +22,7 @@ const Sidebar = () => {
     };
 
     return (
-        <div className="h-screen w-64 bg-gray-800 text-white flex flex-col">
+        <div className="h-screen w-64 bg-gray-800 text-white flex flex-col fixed left-0 top-0">
             {/* Logo or Header */}
             <div className="py-4 px-6 bg-gray-900 text-xl font-bold">
                 HelpDesk System
@@ -30,38 +31,31 @@ const Sidebar = () => {
             {/* Navigation Links */}
             <nav className="flex-grow">
                 <ul className="mt-6 space-y-4 px-6">
-                <li>
-                        <Link 
-                            to="/create-ticket" 
-                            className="block py-2 px-4 rounded hover:bg-gray-700"
-                        >
+                    <li>
+                        <Link to="/create-ticket" className="block py-2 px-4 rounded hover:bg-gray-700">
                             Create a ticket
                         </Link>
                     </li>
                     <li>
-                        <Link 
-                            to="/dashboard" 
-                            className="block py-2 px-4 rounded hover:bg-gray-700"
-                        >
+                        <Link to="/dashboard" className="block py-2 px-4 rounded hover:bg-gray-700">
                             Dashboard
                         </Link>
                     </li>
                     <li>
-                        <Link 
-                            to="/view-tickets" 
-                            className="block py-2 px-4 rounded hover:bg-gray-700"
-                        >
+                        <Link to="/view-tickets" className="block py-2 px-4 rounded hover:bg-gray-700">
                             View Tickets
                         </Link>
                     </li>
-                
+                    <li>
+                        <Link to="/view-reviews" className="block py-2 px-4 rounded hover:bg-gray-700">
+                            Reviews
+                        </Link>
+                    </li>
+
                     {/* Show Admin Dashboard link only for admin */}
                     {role === 'admin' && (
                         <li>
-                            <Link 
-                                to="/admin-dashboard" 
-                                className="block py-2 px-4 rounded hover:bg-gray-700"
-                            >
+                            <Link to="/admin-dashboard" className="block py-2 px-4 rounded hover:bg-gray-700">
                                 Admin Dashboard
                             </Link>
                         </li>
@@ -83,10 +77,7 @@ const Sidebar = () => {
 
             {/* Logout Button */}
             <div className="px-6 mb-4">
-                <button 
-                    onClick={handleLogout} 
-                    className="w-full py-2 px-4 bg-red-600 hover:bg-red-700 rounded"
-                >
+                <button onClick={handleLogout} className="w-full py-2 px-4 bg-red-600 hover:bg-red-700 rounded">
                     Logout
                 </button>
             </div>

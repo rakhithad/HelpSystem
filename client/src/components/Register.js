@@ -38,23 +38,25 @@ const Register = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
+            // Convert inputs to lowercase where necessary
             await axios.post('http://localhost:5000/api/auth/register', {
-                username,
-                password,
-                firstName,
-                lastName,
-                phoneNumber,
-                location,
-                role,
-                ...(role === 'customer' && { companyId }) // Only include companyId for customers
+                username: username.toLowerCase(),
+                password, // Password should generally be case-sensitive, so no conversion
+                firstName: firstName.toLowerCase(),
+                lastName: lastName.toLowerCase(),
+                phoneNumber, // Phone numbers should not be converted to lowercase
+                location: location.toLowerCase(),
+                role: role.toLowerCase(), // Ensure role is lowercase
+                ...(role === 'customer' && { companyId }) // Include companyId only if role is 'customer'
             });
-
+    
             alert('User registered successfully');
         } catch (error) {
             console.error('Error registering user:', error);
             alert('Error registering user');
         }
     };
+    
 
     const handleCreateCompany = () => {
         navigate('/create-company'); // Navigate to the "Create Company" page

@@ -4,75 +4,35 @@ import { useNavigate } from 'react-router-dom';
 
 const ViewTickets = () => {
     const [tickets, setTickets] = useState([]);
-    const [supportEngineers, setSupportEngineers] = useState([]);
-    const [filteredTickets, setFilteredTickets] = useState([]); // Tickets after filtering
-    const [selectedStatus, setSelectedStatus] = useState(''); // Selected status for filtering
+    const [filteredTickets, setFilteredTickets] = useState([]);
+    const [selectedStatus, setSelectedStatus] = useState('');
     const [error, setError] = useState(null);
     const navigate = useNavigate();
 
     // Retrieve the role from localStorage
-    const userRole = localStorage.getItem('role'); // Assuming 'role' is stored in localStorage
+    const userRole = localStorage.getItem('role');
 
     useEffect(() => {
         const fetchData = async () => {
             try {
                 const token = localStorage.getItem('token');
 
-                // Fetch tickets based on the role
+                // Fetch tickets
                 const ticketsResponse = await axios.get('http://localhost:5000/api/tickets/view-tickets', {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 setTickets(ticketsResponse.data);
                 setFilteredTickets(ticketsResponse.data);
-
-                // Fetch support engineers only if the user is not a customer
-                if (userRole !== 'customer') {
-                    const engineersResponse = await axios.get(
-                        'http://localhost:5000/api/auth/support-engineers',
-                        {
-                            headers: { Authorization: `Bearer ${token}` },
-                        }
-                    );
-                    setSupportEngineers(engineersResponse.data);
-                }
             } catch (err) {
-                setError('Failed to fetch data.');
+                setError('Failed to fetch tickets.');
                 console.error(err);
             }
         };
 
         fetchData();
-    }, [userRole]);
+    }, []);
 
-    // Handle ticket updates (status, priority, or assigned engineer)
-    const handleUpdateTicket = async (ticketId, updates) => {
-        try {
-            const token = localStorage.getItem('token');
-            const response = await axios.put(
-                `http://localhost:5000/api/tickets/update-ticket/${ticketId}`,
-                updates,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-
-            // Update the ticket in the local state
-            setTickets((prevTickets) =>
-                prevTickets.map((ticket) =>
-                    ticket._id === ticketId ? response.data : ticket
-                )
-            );
-            setFilteredTickets((prevTickets) =>
-                prevTickets.map((ticket) =>
-                    ticket._id === ticketId ? response.data : ticket
-                )
-            );
-            alert('Ticket updated successfully!');
-        } catch (err) {
-            alert('Failed to update ticket.');
-            console.error(err);
-        }
-    };
-
-    // Filter tickets based on selected status
+    // Filter tickets by status
     useEffect(() => {
         const filtered = selectedStatus
             ? tickets.filter((ticket) => ticket.status === selectedStatus)
@@ -83,15 +43,16 @@ const ViewTickets = () => {
     if (error) return <div>{error}</div>;
 
     return (
-        <div>
-            <h1>View Tickets</h1>
+        <div className="p-6 bg-gray-100 min-h-screen">
+            <h1 className="text-2xl font-bold mb-6">View Tickets</h1>
 
             {/* Filters */}
-            <div>
-                <label>Filter by Status: </label>
+            <div className="mb-4">
+                <label className="mr-2">Filter by Status: </label>
                 <select
                     value={selectedStatus}
                     onChange={(e) => setSelectedStatus(e.target.value)}
+                    className="p-2 border rounded"
                 >
                     <option value="">All Statuses</option>
                     <option value="not started">Not Started</option>
@@ -102,62 +63,45 @@ const ViewTickets = () => {
             </div>
 
             {/* Tickets List */}
-            <ul>
+            <div className="bg-white shadow-md rounded p-4">
                 {filteredTickets.length === 0 ? (
-                    <li>No tickets available</li>
+                    <div className="text-gray-500">No tickets available</div>
                 ) : (
                     filteredTickets.map((ticket) => (
-                        <li key={ticket._id}>
-                            <strong>{ticket.title}</strong> - {ticket.status} - Priority: {ticket.priority}
-                            <br />
-                            {userRole !== 'customer' && (
-                                <div>
-                                    <label>Status: </label>
-                                    <select
-                                        value={ticket.status}
-                                        onChange={(e) =>
-                                            handleUpdateTicket(ticket._id, { status: e.target.value })
-                                        }
-                                    >
-                                        <option value="not started">Not Started</option>
-                                        <option value="in progress">In Progress</option>
-                                        <option value="stuck">Stuck</option>
-                                        <option value="done">Done</option>
-                                    </select>
-                                    <label> Priority: </label>
-                                    <input
-                                        type="number"
-                                        value={ticket.priority}
-                                        min="1"
-                                        max="5"
-                                        onChange={(e) =>
-                                            handleUpdateTicket(ticket._id, { priority: e.target.value })
-                                        }
-                                    />
-                                    <label> Assign to: </label>
-                                    <select
-                                        value={ticket.assignedSupportEngineer || ''}
-                                        onChange={(e) =>
-                                            handleUpdateTicket(ticket._id, {
-                                                assignedSupportEngineer: e.target.value,
-                                            })
-                                        }
-                                    >
-                                        <option value="">Not Assigned</option>
-                                        {supportEngineers.map((engineer) => (
-                                            <option key={engineer.uid} value={`${engineer.uid}`}>
-                                                {engineer.firstName}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
+                        <div
+                            key={ticket._id}
+                            className="flex justify-start items-center gap-8 py-4"
+                        >
+                            <div>
+                                <strong>Ticket ID:</strong> {ticket.tid}
+                            </div>
+                            <div>
+                                <strong>Title:</strong> {ticket.title}
+                            </div>
+                            <div>
+                                <strong>Description:</strong> {ticket.description}
+                            </div>
+                            <div>
+                                <strong>Priority:</strong> {ticket.priority}
+                            </div>
+                            <div>
+                                <strong>User ID:</strong> {ticket.uid}
+                            </div>
+                            <div>
+                                <strong>Status:</strong> {ticket.status}
+                            </div>
                             {userRole === 'customer' && ticket.status === 'done' && (
                                 <div>
                                     {ticket.review ? (
-                                        <button disabled>Reviewed</button>
+                                        <button
+                                            className="bg-gray-400 text-white p-2 rounded cursor-not-allowed"
+                                            disabled
+                                        >
+                                            Reviewed
+                                        </button>
                                     ) : (
                                         <button
+                                            className="bg-blue-500 text-white p-2 rounded"
                                             onClick={() => navigate(`/review-ticket/${ticket._id}`)}
                                         >
                                             Write Review
@@ -165,10 +109,10 @@ const ViewTickets = () => {
                                     )}
                                 </div>
                             )}
-                        </li>
+                        </div>
                     ))
                 )}
-            </ul>
+            </div>
         </div>
     );
 };

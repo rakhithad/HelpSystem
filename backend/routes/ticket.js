@@ -100,6 +100,21 @@ router.put('/update-ticket/:id', authenticateToken, async (req, res) => {
     }
 });
 
+router.delete('/delete-ticket/:id', authenticateToken, async (req, res) => {
+    try {
+        const ticket = await Ticket.findByIdAndDelete(req.params.id);
+
+        if (!ticket) {
+            return res.status(404).json({ message: 'Ticket not found' });
+        }
+
+        res.status(200).json({ message: 'Ticket deleted successfully', ticket });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Failed to delete ticket', error: error.message });
+    }
+});
+
 
 router.get('/ticket-counts', async (req, res) => {
     const { role, uid } = req.headers;
@@ -241,6 +256,23 @@ router.post('/review/:ticketId', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Failed to submit review' });
     }
 });
+
+
+// Fetch all reviews
+router.get('/reviews', authenticateToken, async (req, res) => {
+    try {
+        const reviews = await Ticket.find(
+            { review: { $exists: true }, rating: { $exists: true } }, // Fetch only tickets with reviews and ratings
+            { review: 1, rating: 1, title: 1, account: 1 } // Include specific fields
+        );
+
+        res.json(reviews);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Failed to fetch reviews' });
+    }
+});
+
 
 
 
