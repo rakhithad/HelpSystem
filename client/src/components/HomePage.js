@@ -8,7 +8,7 @@ const HomePage = () => {
             {/* Navbar */}
             <nav className="bg-blue-600 w-full py-2 px-8 flex justify-between items-center shadow-md">
                 <div className="text-white text-2xl font-bold">
-                    {/* Add logo or title here if needed */}
+                    logo
                 </div>
                 <div className="flex space-x-4">
                     <Link to="/view-reviews">

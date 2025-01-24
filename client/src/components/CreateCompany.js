@@ -17,7 +17,6 @@ const CreateCompany = () => {
                 phoneNumber,
             });
             console.log(response);
-            // Redirect to the registration page after successful company creation
             alert('Company created successfully');
             navigate('/register');
         } catch (error) {
@@ -27,31 +26,60 @@ const CreateCompany = () => {
     };
 
     return (
-        <div>
-            <h2>Create New Company</h2>
-            <form onSubmit={handleSubmit}>
-                <input
-                    type="text"
-                    placeholder="Company Name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                />
-                <input
-                    type="text"
-                    placeholder="Address"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    required
-                />
-                <input
-                    type="text"
-                    placeholder="Phone Number"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    required
-                />
-                <button type="submit">Create Company</button>
+        <div className="ml-64 p-8 min-h-screen bg-gray-100">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Create New Company</h2>
+            <form
+                onSubmit={handleSubmit}
+                className="bg-white p-6 rounded shadow-md max-w-lg mx-auto"
+            >
+                <div className="mb-4">
+                    <label className="block text-gray-700 font-semibold mb-2" htmlFor="name">
+                        Company Name
+                    </label>
+                    <input
+                        id="name"
+                        type="text"
+                        placeholder="Enter company name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                    />
+                </div>
+                <div className="mb-4">
+                    <label className="block text-gray-700 font-semibold mb-2" htmlFor="address">
+                        Address
+                    </label>
+                    <input
+                        id="address"
+                        type="text"
+                        placeholder="Enter company address"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                    />
+                </div>
+                <div className="mb-4">
+                    <label className="block text-gray-700 font-semibold mb-2" htmlFor="phoneNumber">
+                        Phone Number
+                    </label>
+                    <input
+                        id="phoneNumber"
+                        type="text"
+                        placeholder="Enter phone number"
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                    />
+                </div>
+                <button
+                    type="submit"
+                    className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition duration-200"
+                >
+                    Create Company
+                </button>
             </form>
         </div>
     );

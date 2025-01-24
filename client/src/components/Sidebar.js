@@ -13,7 +13,7 @@ const Sidebar = () => {
         localStorage.removeItem('uid');  // Clear the uid
         localStorage.removeItem('role'); // Clear the role
         localStorage.removeItem('username'); // Clear the username
-        navigate('/login'); // Redirect to login page
+        navigate('/home'); // Redirect to login page
     };
 
     // Handle click to redirect to the account page

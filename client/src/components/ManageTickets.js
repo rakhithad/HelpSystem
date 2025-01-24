@@ -11,7 +11,6 @@ const ManageTickets = () => {
     const [error, setError] = useState(null);
     const navigate = useNavigate();
 
-    // Retrieve the role from localStorage
     const userRole = localStorage.getItem('role');
 
     useEffect(() => {
@@ -26,20 +25,15 @@ const ManageTickets = () => {
             try {
                 const token = localStorage.getItem('token');
 
-                // Fetch all tickets
                 const ticketsResponse = await axios.get('http://localhost:5000/api/tickets/view-tickets', {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 setTickets(ticketsResponse.data);
                 setFilteredTickets(ticketsResponse.data);
 
-                // Fetch unique company names
-                const companyNames = [
-                    ...new Set(ticketsResponse.data.map((ticket) => ticket.company)),
-                ];
+                const companyNames = [...new Set(ticketsResponse.data.map((ticket) => ticket.company))];
                 setCompanies(companyNames);
 
-                // Fetch support engineers
                 const engineersResponse = await axios.get('http://localhost:5000/api/auth/support-engineers', {
                     headers: { Authorization: `Bearer ${token}` },
                 });
@@ -53,21 +47,17 @@ const ManageTickets = () => {
         fetchData();
     }, []);
 
-    // Filter tickets based on filters
     useEffect(() => {
         let filtered = [...tickets];
 
-        // Filter by status
         if (filters.status) {
             filtered = filtered.filter((ticket) => ticket.status === filters.status);
         }
 
-        // Filter by company
         if (filters.company) {
             filtered = filtered.filter((ticket) => ticket.company === filters.company);
         }
 
-        // Filter by date
         if (filters.date !== 'all') {
             const now = new Date();
             if (filters.date === 'today') {
@@ -96,7 +86,6 @@ const ManageTickets = () => {
         setFilters({ ...filters, [filterName]: value });
     };
 
-    // Function to handle ticket updates
     const handleUpdateTicket = async (ticketId, updates) => {
         try {
             const token = localStorage.getItem('token');
@@ -106,20 +95,18 @@ const ManageTickets = () => {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
-            // Update the ticket in the local state
             setTickets((prevTickets) =>
                 prevTickets.map((ticket) =>
                     ticket._id === ticketId ? response.data : ticket
                 )
             );
-            alert('Ticket updated successfully!');
+            
         } catch (err) {
             alert('Failed to update ticket.');
             console.error(err);
         }
     };
 
-    // Function to handle ticket deletion
     const handleDeleteTicket = async (ticketId) => {
         try {
             const token = localStorage.getItem('token');
@@ -127,9 +114,8 @@ const ManageTickets = () => {
                 headers: { Authorization: `Bearer ${token}` },
             });
 
-            // Remove the ticket from the local state
             setTickets((prevTickets) => prevTickets.filter((ticket) => ticket._id !== ticketId));
-            alert('Ticket deleted successfully!');
+            
         } catch (err) {
             alert('Failed to delete ticket.');
             console.error(err);
@@ -139,12 +125,12 @@ const ManageTickets = () => {
     if (error) return <div>{error}</div>;
 
     return (
-        <div>
-            <h1>Manage Tickets</h1>
+        <div className="ml-64 p-6 bg-gray-100 min-h-screen">
+            <h1 className="text-2xl font-bold mb-4">Manage Tickets</h1>
 
             {/* Filters */}
-            <div className="filters mb-4">
-                <label className="mr-2">Status:</label>
+            <div className="filters mb-6 p-4 bg-white rounded shadow">
+                <label className="mr-2 font-semibold">Status:</label>
                 <select
                     value={filters.status}
                     onChange={(e) => handleFilterChange('status', e.target.value)}
@@ -157,7 +143,7 @@ const ManageTickets = () => {
                     <option value="done">Done</option>
                 </select>
 
-                <label className="mr-2">Company:</label>
+                <label className="mr-2 font-semibold">Company:</label>
                 <select
                     value={filters.company}
                     onChange={(e) => handleFilterChange('company', e.target.value)}
@@ -171,7 +157,7 @@ const ManageTickets = () => {
                     ))}
                 </select>
 
-                <label className="mr-2">Date:</label>
+                <label className="mr-2 font-semibold">Date:</label>
                 <select
                     value={filters.date}
                     onChange={(e) => handleFilterChange('date', e.target.value)}
@@ -185,65 +171,76 @@ const ManageTickets = () => {
             </div>
 
             {/* Tickets List */}
-            <ul>
+            <div className="p-4 bg-white rounded shadow">
                 {filteredTickets.length === 0 ? (
-                    <li>No tickets available</li>
+                    <p>No tickets available.</p>
                 ) : (
-                    filteredTickets.map((ticket) => (
-                        <li key={ticket._id}>
-                            <strong>{ticket.title}</strong> - {ticket.status} - Priority: {ticket.priority}
-                            <br />
-                            <div>
-                                <label>Status: </label>
-                                <select
-                                    value={ticket.status}
-                                    onChange={(e) =>
-                                        handleUpdateTicket(ticket._id, { status: e.target.value })
-                                    }
+                    <ul className="space-y-4">
+                        {filteredTickets.map((ticket) => (
+                            <li
+                                key={ticket._id}
+                                className="p-4 bg-gray-50 border rounded shadow-sm"
+                            >
+                                <strong className="block">{ticket.title}</strong>
+                                <span className="text-sm text-gray-600">
+                                    {ticket.status} - Priority: {ticket.priority}
+                                </span>
+                                <div className="mt-2">
+                                    <label>Status: </label>
+                                    <select
+                                        value={ticket.status}
+                                        onChange={(e) =>
+                                            handleUpdateTicket(ticket._id, { status: e.target.value })
+                                        }
+                                        className="p-1 border rounded"
+                                    >
+                                        <option value="not started">Not Started</option>
+                                        <option value="in progress">In Progress</option>
+                                        <option value="stuck">Stuck</option>
+                                        <option value="done">Done</option>
+                                    </select>
+
+                                    <label className="ml-2">Priority: </label>
+                                    <input
+                                        type="number"
+                                        value={ticket.priority}
+                                        min="1"
+                                        max="5"
+                                        onChange={(e) =>
+                                            handleUpdateTicket(ticket._id, { priority: e.target.value })
+                                        }
+                                        className="p-1 border rounded w-12"
+                                    />
+
+                                    <label className="ml-2">Assign to: </label>
+                                    <select
+                                        value={ticket.assignedSupportEngineer || ''}
+                                        onChange={(e) =>
+                                            handleUpdateTicket(ticket._id, {
+                                                assignedSupportEngineer: e.target.value,
+                                            })
+                                        }
+                                        className="p-1 border rounded"
+                                    >
+                                        <option value="">Not Assigned</option>
+                                        {supportEngineers.map((engineer) => (
+                                            <option key={engineer.uid} value={engineer.uid}>
+                                                {engineer.firstName}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <button
+                                    onClick={() => handleDeleteTicket(ticket._id)}
+                                    className="mt-2 p-2 bg-red-500 text-white rounded hover:bg-red-600"
                                 >
-                                    <option value="not started">Not Started</option>
-                                    <option value="in progress">In Progress</option>
-                                    <option value="stuck">Stuck</option>
-                                    <option value="done">Done</option>
-                                </select>
-
-                                <label> Priority: </label>
-                                <input
-                                    type="number"
-                                    value={ticket.priority}
-                                    min="1"
-                                    max="5"
-                                    onChange={(e) =>
-                                        handleUpdateTicket(ticket._id, { priority: e.target.value })
-                                    }
-                                />
-
-                                <label> Assign to: </label>
-                                <select
-                                    value={ticket.assignedSupportEngineer || ''}
-                                    onChange={(e) =>
-                                        handleUpdateTicket(ticket._id, {
-                                            assignedSupportEngineer: e.target.value,
-                                        })
-                                    }
-                                >
-                                    <option value="">Not Assigned</option>
-                                    {supportEngineers.map((engineer) => (
-                                        <option key={engineer.uid} value={`${engineer.uid}`}>
-                                            {engineer.firstName}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* Delete Ticket Button */}
-                            <button onClick={() => handleDeleteTicket(ticket._id)}>
-                                Delete Ticket
-                            </button>
-                        </li>
-                    ))
+                                    Delete Ticket
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
                 )}
-            </ul>
+            </div>
         </div>
     );
 };

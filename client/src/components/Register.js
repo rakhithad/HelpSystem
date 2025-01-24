@@ -9,25 +9,24 @@ const Register = () => {
     const [lastName, setLastName] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
     const [location, setLocation] = useState('');
-    const [role, setRole] = useState('customer'); // Default role is 'customer'
+    const [role, setRole] = useState('customer');
     const [companies, setCompanies] = useState([]);
-    const [companyId, setCompanyId] = useState(''); // Selected company
-    const [showCompanyDropdown, setShowCompanyDropdown] = useState(false); // Show company dropdown
+    const [companyId, setCompanyId] = useState('');
+    const [showCompanyDropdown, setShowCompanyDropdown] = useState(false);
     const navigate = useNavigate();
 
-    // Fetch companies when the role is set to "Customer"
     useEffect(() => {
         const fetchCompanies = async () => {
             if (role === 'customer') {
                 try {
                     const response = await axios.get('http://localhost:5000/api/auth/companies');
                     setCompanies(response.data);
-                    setShowCompanyDropdown(response.data.length > 0); // Show dropdown if companies exist
+                    setShowCompanyDropdown(response.data.length > 0);
                 } catch (error) {
                     console.error('Error fetching companies:', error);
                 }
             } else {
-                setShowCompanyDropdown(false); // Hide company dropdown if role changes
+                setShowCompanyDropdown(false);
                 setCompanies([]);
             }
         };
@@ -38,103 +37,122 @@ const Register = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            // Convert inputs to lowercase where necessary
             await axios.post('http://localhost:5000/api/auth/register', {
                 username: username.toLowerCase(),
-                password, // Password should generally be case-sensitive, so no conversion
+                password,
                 firstName: firstName.toLowerCase(),
                 lastName: lastName.toLowerCase(),
-                phoneNumber, // Phone numbers should not be converted to lowercase
+                phoneNumber,
                 location: location.toLowerCase(),
-                role: role.toLowerCase(), // Ensure role is lowercase
-                ...(role === 'customer' && { companyId }) // Include companyId only if role is 'customer'
+                role: role.toLowerCase(),
+                ...(role === 'customer' && { companyId }),
             });
-    
             alert('User registered successfully');
         } catch (error) {
             console.error('Error registering user:', error);
             alert('Error registering user');
         }
     };
-    
 
     const handleCreateCompany = () => {
-        navigate('/create-company'); // Navigate to the "Create Company" page
+        navigate('/create-company');
     };
 
     return (
-        <form onSubmit={handleSubmit}>
-            <input
-                type="text"
-                placeholder="Username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-            />
-            <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-            />
-            <input
-                type="text"
-                placeholder="First Name"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-            />
-            <input
-                type="text"
-                placeholder="Last Name"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-            />
-            <input
-                type="text"
-                placeholder="Phone Number"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-            />
-            <input
-                type="text"
-                placeholder="Location"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-            />
+        <div className="ml-64 p-8 h-screen bg-gray-100"> {/* Adjust to account for the Sidebar */}
+            <div className="bg-white shadow rounded-lg p-8 max-w-lg mx-auto">
+                <h1 className="text-2xl font-bold text-gray-800 mb-6">Register</h1>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <input
+                        type="text"
+                        placeholder="Username"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        required
+                        className="w-full p-2 border border-gray-300 rounded"
+                    />
+                    <input
+                        type="password"
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        className="w-full p-2 border border-gray-300 rounded"
+                    />
+                    <input
+                        type="text"
+                        placeholder="First Name"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded"
+                    />
+                    <input
+                        type="text"
+                        placeholder="Last Name"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded"
+                    />
+                    <input
+                        type="text"
+                        placeholder="Phone Number"
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded"
+                    />
+                    <input
+                        type="text"
+                        placeholder="Location"
+                        value={location}
+                        onChange={(e) => setLocation(e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded"
+                    />
 
-            {/* Role Selection Dropdown */}
-            <select value={role} onChange={(e) => setRole(e.target.value)}>
-                <option value="customer">Customer</option>
-                <option value="admin">Admin</option>
-                <option value="support_engineer">Support Engineer</option>
-            </select>
+                    <select
+                        value={role}
+                        onChange={(e) => setRole(e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded"
+                    >
+                        <option value="customer">Customer</option>
+                        <option value="admin">Admin</option>
+                        <option value="support_engineer">Support Engineer</option>
+                    </select>
 
-            {/* Company Dropdown for Customers */}
-            {showCompanyDropdown && (
-                <select
-                    value={companyId}
-                    onChange={(e) => setCompanyId(e.target.value)}
-                    required
-                >
-                    <option value="">Select a Company</option>
-                    {companies.map((company) => (
-                        <option key={company.companyId} value={company.companyId}>
-                            {company.name}
-                        </option>
-                    ))}
-                </select>
-            )}
+                    {showCompanyDropdown && (
+                        <select
+                            value={companyId}
+                            onChange={(e) => setCompanyId(e.target.value)}
+                            required
+                            className="w-full p-2 border border-gray-300 rounded"
+                        >
+                            <option value="">Select a Company</option>
+                            {companies.map((company) => (
+                                <option key={company.companyId} value={company.companyId}>
+                                    {company.name}
+                                </option>
+                            ))}
+                        </select>
+                    )}
 
-            {/* Show the "Create a Company" button only for customers */}
-            {role === 'customer' && (
-                <button type="button" onClick={handleCreateCompany}>
-                    No Companies Found? Create a New Company
-                </button>
-            )}
+                    {role === 'customer' && (
+                        <button
+                            type="button"
+                            onClick={handleCreateCompany}
+                            className="text-sm text-blue-500 hover:underline"
+                        >
+                            No Companies Found? Create a New Company
+                        </button>
+                    )}
 
-            <button type="submit">Register</button>
-        </form>
+                    <button
+                        type="submit"
+                        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
+                    >
+                        Register
+                    </button>
+                </form>
+            </div>
+        </div>
     );
 };
 

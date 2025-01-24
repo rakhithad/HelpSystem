@@ -25,40 +25,63 @@ const ViewReviewsPage = () => {
     }, []);
 
     if (loading) {
-        return <div>Loading reviews...</div>;
+        return <div className="flex items-center justify-center min-h-screen">Loading reviews...</div>;
     }
 
     if (error) {
-        return <div>Error: {error}</div>;
+        return <div className="flex items-center justify-center min-h-screen text-red-500">Error: {error}</div>;
     }
 
     return (
-        <div className="p-6 bg-gray-100 min-h-screen">
-            <h1 className="text-2xl font-bold mb-6">Customer Reviews</h1>
-            {reviews.length === 0 ? (
-                <p>No reviews available</p>
-            ) : (
-                <table className="w-full bg-white shadow-md rounded">
-                    <thead>
-                        <tr>
-                            <th className="border px-4 py-2">Ticket Title</th>
-                            <th className="border px-4 py-2">Customer Account</th>
-                            <th className="border px-4 py-2">Review</th>
-                            <th className="border px-4 py-2">Rating</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {reviews.map((review) => (
-                            <tr key={review._id}>
-                                <td className="border px-4 py-2">{review.title}</td>
-                                <td className="border px-4 py-2">{review.account}</td>
-                                <td className="border px-4 py-2">{review.review}</td>
-                                <td className="border px-4 py-2">{review.rating} / 5</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            )}
+        <div className="flex min-h-screen">
+            {/* Sidebar */}
+            <div className="w-64 bg-blue-600 text-white flex-shrink-0">
+                <div className="p-6">
+                    <h2 className="text-2xl font-bold">Admin Panel</h2>
+                </div>
+                <ul className="space-y-2">
+                    <li className="px-6 py-3 hover:bg-blue-700">
+                        <a href="/dashboard" className="block">Dashboard</a>
+                    </li>
+                    <li className="px-6 py-3 hover:bg-blue-700">
+                        <a href="/reviews" className="block">View Reviews</a>
+                    </li>
+                    <li className="px-6 py-3 hover:bg-blue-700">
+                        <a href="/reports" className="block">Reports</a>
+                    </li>
+                </ul>
+            </div>
+
+            {/* Main content */}
+            <div className="flex-1 p-8 bg-gray-100">
+                <h1 className="text-3xl font-bold text-gray-800 mb-6">Customer Reviews</h1>
+                {reviews.length === 0 ? (
+                    <p className="text-gray-600">No reviews available</p>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full bg-white shadow-md rounded">
+                            <thead>
+                                <tr className="bg-gray-200">
+                                    <th className="border px-4 py-2 text-left">Ticket Title</th>
+                                    <th className="border px-4 py-2 text-left">Customer Account</th>
+                                    <th className="border px-4 py-2 text-left">Review</th>
+                                    <th className="border px-4 py-2 text-left">Rating</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {reviews.map((review) => (
+                                    <tr key={review._id} className="hover:bg-gray-100">
+                                        <td className="border px-4 py-2">{review.title}</td>
+                                        <td className="border px-4 py-2">{review.uid}</td>
+                                        <td className="border px-4 py-2">{review.review}</td>
+                                        <td className="border px-4 py-2">{review.rating} / 5</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

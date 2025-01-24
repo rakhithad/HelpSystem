@@ -263,7 +263,7 @@ router.get('/reviews', authenticateToken, async (req, res) => {
     try {
         const reviews = await Ticket.find(
             { review: { $exists: true }, rating: { $exists: true } }, // Fetch only tickets with reviews and ratings
-            { review: 1, rating: 1, title: 1, account: 1 } // Include specific fields
+            { review: 1, rating: 1, title: 1, uid: 1 } // Include specific fields
         );
 
         res.json(reviews);
