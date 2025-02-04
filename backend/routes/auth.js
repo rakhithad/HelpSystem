@@ -5,7 +5,7 @@ const User = require('../models/User');
 require('dotenv').config();
 const Counter = require('../models/counter');
 const Company = require('../models/Company');
-const { authenticateToken } = require('../middleware/authenticateToken');
+const authenticateToken = require('../middleware/authenticateToken');
 
 const router = express.Router();
 
@@ -14,20 +14,21 @@ router.post('/register', async (req, res) => {
     const { username, password, firstName, lastName, phoneNumber, location, role, companyId } = req.body;
 
     try {
-
+        // Check if the username already exists
         const existingUser = await User.findOne({ username });
         if (existingUser) return res.status(400).json({ message: 'Username already taken' });
 
+        // Validate companyId for customers
         if (role === 'customer') {
             const company = await Company.findOne({ companyId });
             if (!company) {
                 return res.status(400).json({ message: 'Invalid companyId. Please create a company first.' });
             }
         }
+
         console.log('Received companyId:', companyId);
 
-
-        // Hash password
+        // Hash the password
         const hashedPassword = await bcrypt.hash(password, 10);
 
         // Generate a unique UID
@@ -40,16 +41,7 @@ router.post('/register', async (req, res) => {
         if (!counter || !counter.count) {
             throw new Error("Counter not found or failed to increment");
         }
-        
         const uid = `UID-${counter.count}`;
-
-        // Validate companyId for customers
-        if (role === 'customer') {
-            const company = await Company.findOne({ companyId });
-            if (!company) {
-                return res.status(400).json({ message: 'Invalid companyId. Please create a company first.' });
-            }
-        }
 
         // Create and save the new user
         const newUser = new User({
@@ -65,38 +57,72 @@ router.post('/register', async (req, res) => {
         });
 
         await newUser.save();
-        res.status(201).json({ message: 'User registered successfully' });
+
+        // Generate JWT token
+        const token = jwt.sign(
+            { id: newUser._id, username: newUser.username, uid: newUser.uid, role: newUser.role },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' } // Token valid for 1 hour
+        );
+
+        res.status(201).json({ message: 'User registered successfully', token });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Error registering user' });
     }
 });
 
+
 // Login Route
 router.post('/login', async (req, res) => {
     const { username, password } = req.body;
 
-    console.log('Username:', username);  // Log username
-    console.log('Password:', password);  // Log password
-
     try {
+        // Check if the user exists
         const user = await User.findOne({ username });
-        if (!user) return res.status(400).send('User not found');
+        if (!user) {
+            console.log('User not found');
+            return res.status(400).json({ message: 'User not found' });
+        }
 
+        // Compare passwords
         const isMatch = await bcrypt.compare(password, user.password);
-        console.log('Password Match:', isMatch);  // Log match status
+        if (!isMatch) {
+            console.log('Invalid credentials');
+            return res.status(400).json({ message: 'Invalid credentials' });
+        }
 
-        if (!isMatch) return res.status(400).send('Invalid credentials');
+        // Generate JWT token with additional details
+        const token = jwt.sign(
+            {
+                id: user._id,
+                username: user.username,
+                uid: user.uid,
+                role: user.role
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' } // Set expiration time
+        );
 
-        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-        console.log('User:', user);
-        console.log('UID:', user.uid); 
-        
-        res.json({ token, uid: user.uid, role: user.role });
+        // Log for debugging
+        console.log('Login successful:', {
+            username: user.username,
+            role: user.role,
+            uid: user.uid
+        });
+
+        // Send response
+        res.status(200).json({
+            token, // Return the token for authorization
+            uid: user.uid, // Include UID in the response
+            username: user.username, // Include username for convenience
+            role: user.role, // Include role for front-end use
+            message: 'Login successful'
+        });
 
     } catch (error) {
-        console.error(error);  // Log any error
-        res.status(400).send('Error logging in');
+        console.error('Error during login:', error);
+        res.status(500).json({ message: 'An error occurred during login' });
     }
 });
 
@@ -189,11 +215,13 @@ router.get('/account', authenticateToken, async (req, res) => {
 // Update logged-in user details
 router.put('/account', authenticateToken, async (req, res) => {
     try {
-        const updates = req.body; // Get updated fields from the request
+        console.log('Request body:', req.body); // Check incoming updates
+        console.log('Authenticated user:', req.user); // Check user details
+        const updates = req.body;
         const user = await User.findOneAndUpdate(
             { uid: req.user.uid },
             { $set: updates },
-            { new: true } // Return the updated document
+            { new: true }
         );
         if (!user) return res.status(404).json({ message: 'User not found' });
 
@@ -203,6 +231,7 @@ router.put('/account', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Failed to update user details' });
     }
 });
+
 
 
 router.post('/create-company', async (req, res) => {

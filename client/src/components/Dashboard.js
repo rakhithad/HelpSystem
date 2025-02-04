@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { jwtDecode } from 'jwt-decode';
 
 const Dashboard = () => {
     const [ticketCounts, setTicketCounts] = useState({
@@ -11,9 +12,25 @@ const Dashboard = () => {
     const [selectedTickets, setSelectedTickets] = useState([]);
     const [selectedType, setSelectedType] = useState('');
 
-    // Get role and uid from local storage
-    const role = localStorage.getItem('role');
-    const uid = localStorage.getItem('uid');
+    
+    const token = localStorage.getItem('token');
+    let role = null;
+    let uid = null;
+
+    if (token) {
+            try {
+                // Decode the token to get the role and username
+                const decodedToken = jwtDecode(token);
+                role = decodedToken.role;
+                uid = decodedToken.uid;
+                
+            } catch (error) {
+                console.error('Error decoding token:', error);
+            }
+        }
+
+
+    
 
     // Fetch ticket counts based on role
     useEffect(() => {

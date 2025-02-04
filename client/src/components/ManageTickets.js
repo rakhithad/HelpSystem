@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
 
 const ManageTickets = () => {
     const [tickets, setTickets] = useState([]);
@@ -9,16 +8,7 @@ const ManageTickets = () => {
     const [companies, setCompanies] = useState([]);
     const [filters, setFilters] = useState({ status: '', company: '', date: 'all' });
     const [error, setError] = useState(null);
-    const navigate = useNavigate();
 
-    const userRole = localStorage.getItem('role');
-
-    useEffect(() => {
-        if (userRole !== 'admin' && userRole !== 'support_engineer') {
-            alert('Access denied!');
-            navigate('/');
-        }
-    }, [userRole, navigate]);
 
     useEffect(() => {
         const fetchData = async () => {

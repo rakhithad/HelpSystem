@@ -10,16 +10,24 @@ const Login = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post('http://localhost:5000/api/auth/login', { username, password });
+            // Convert username and password to lowercase
+            const lowerCaseUsername = username.toLowerCase();
+            const lowerCasePassword = password.toLowerCase();
+
+            const response = await axios.post('http://localhost:5000/api/auth/login', {
+                username: lowerCaseUsername,
+                password: lowerCasePassword,
+            });
+
+            // Save token to localStorage
             localStorage.setItem('token', response.data.token);
-            localStorage.setItem('uid', response.data.uid);
-            localStorage.setItem('role', response.data.role);
             console.log(localStorage);
 
+            // Navigate to dashboard
             navigate('/dashboard');
         } catch (error) {
             if (error.response) {
-                alert(error.response.data);
+                alert(error.response.data.message); // Alert with meaningful error message
             } else {
                 alert('Error logging in');
             }
@@ -60,9 +68,8 @@ const Login = () => {
                 </form>
                 <p className="text-sm text-center text-gray-600">
                     Don't have an account?{' '}
-                    <br></br>
+                    <br />
                     Contact +94 702858731
-                    
                 </p>
             </div>
         </div>

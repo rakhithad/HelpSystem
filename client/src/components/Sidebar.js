@@ -1,25 +1,47 @@
 // Sidebar Component
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { jwtDecode } from 'jwt-decode'; // Import jwt-decode
+
 
 const Sidebar = () => {
     const navigate = useNavigate();
-    const role = localStorage.getItem('role'); // Get the user's role from localStorage
-    const username = localStorage.getItem('username'); // Get the username from localStorage
+     // Get the user's role from localStorage
+     const token = localStorage.getItem('token');
+     let role = null;
+     let username = null;
+     
 
-    // Logout function
+     // Logout function
     const handleLogout = () => {
         localStorage.removeItem('token'); // Clear the token from localStorage
-        localStorage.removeItem('uid');  // Clear the uid
-        localStorage.removeItem('role'); // Clear the role
-        localStorage.removeItem('username'); // Clear the username
         navigate('/home'); // Redirect to login page
     };
+
+     if (token) {
+        try {
+            // Decode the token to get the role and username
+            const decodedToken = jwtDecode(token);
+            role = decodedToken.role; 
+            username = decodedToken.username;
+            
+            
+        } catch (error) {
+            console.error('Error decoding token:', error);
+            // If the token is invalid, handle it (e.g., redirect to login)
+            handleLogout();
+        }
+    }
 
     // Handle click to redirect to the account page
     const goToAccountPage = () => {
         navigate('/account');
     };
+
+    
+
+
+
 
     return (
         <div className="h-screen w-64 bg-gray-800 text-white flex flex-col fixed left-0 top-0">

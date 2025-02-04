@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { jwtDecode } from 'jwt-decode';
 
 const CreateTicket = () => {
     const [formData, setFormData] = useState({
@@ -10,10 +11,23 @@ const CreateTicket = () => {
     });
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [role, setRole] = useState(null);
+    const [uid, setUid] = useState(null);
 
-    // Retrieve the user's role from localStorage
-    const userRole = localStorage.getItem('role'); // Assuming role is stored in localStorage
-
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            try {
+                const decodedToken = jwtDecode(token);
+                setRole(decodedToken.role);
+                setUid(decodedToken.uid);
+            } catch (error) {
+                console.error('Error decoding token:', error);
+                // Handle invalid token (e.g., redirect to login)
+            }
+        }
+    }, []);
+    
     // Update form data when input changes
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -24,9 +38,7 @@ const CreateTicket = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            // Send a POST request to the backend API
-            const uid = localStorage.getItem('uid'); // Get user ID from localStorage
-
+            
             const response = await axios.post('http://localhost:5000/api/tickets', {
                 ...formData,
                 uid: uid,
@@ -81,7 +93,7 @@ const CreateTicket = () => {
                 </div>
 
                 {/* Show Priority input only for Admins and Support Engineers */}
-                {(userRole === 'admin' || userRole === 'support_engineer') && (
+                {(role === 'admin' || role === 'support_engineer') && (
                     <div className="mb-4">
                         <label className="block font-semibold mb-2">Priority (1-5):</label>
                         <input

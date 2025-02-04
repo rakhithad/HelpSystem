@@ -48,6 +48,17 @@ const Register = () => {
                 ...(role === 'customer' && { companyId }),
             });
             alert('User registered successfully');
+
+            // Reset the form fields
+            setUsername('');
+            setPassword('');
+            setFirstName('');
+            setLastName('');
+            setPhoneNumber('');
+            setLocation('');
+            setRole('customer');
+            setCompanyId('');
+            
         } catch (error) {
             console.error('Error registering user:', error);
             alert('Error registering user');

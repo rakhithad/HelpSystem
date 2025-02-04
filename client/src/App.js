@@ -22,7 +22,7 @@ const App = () => {
         return !!token; // Return true if token exists
     };
 
-    const ExcludeSidebarRoutes = ["/login", "/home"]; // Routes where sidebar should not appear
+    const ExcludeSidebarRoutes = ["/login", "/home", "/report"]; // Routes where sidebar should not appear
 
     const MainContent = () => {
         const location = useLocation(); // Get the current route
