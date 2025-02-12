@@ -1,89 +1,71 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import React, { useEffect, useState } from "react";
+import axios from "axios";
 
 const ViewReviewsPage = () => {
-    const [reviews, setReviews] = useState([]);
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(true);
+  const [reviews, setReviews] = useState([]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const fetchReviews = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                const response = await axios.get('http://localhost:5000/api/tickets/reviews', {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-                setReviews(response.data);
-            } catch (err) {
-                setError(err.response?.data?.message || 'Failed to fetch reviews');
-            } finally {
-                setLoading(false);
-            }
-        };
+  useEffect(() => {
+    const fetchReviews = async () => {
+      try {
+        
+        const response = await axios.get(
+          "http://localhost:5000/api/tickets/reviews",
+          
+        );
 
-        fetchReviews();
-    }, []);
+        // Filter only reviewed tickets
+        const reviewedTickets = response.data.filter(
+          (review) => review.review && review.review.trim() !== ""
+        );
 
-    if (loading) {
-        return <div className="flex items-center justify-center min-h-screen">Loading reviews...</div>;
-    }
+        setReviews(reviewedTickets);
+      } catch (err) {
+        setError(err.response?.data?.message || "Failed to fetch reviews");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    if (error) {
-        return <div className="flex items-center justify-center min-h-screen text-red-500">Error: {error}</div>;
-    }
+    fetchReviews();
+  }, []);
 
-    return (
-        <div className="flex min-h-screen">
-            {/* Sidebar */}
-            <div className="w-64 bg-blue-600 text-white flex-shrink-0">
-                <div className="p-6">
-                    <h2 className="text-2xl font-bold">Admin Panel</h2>
-                </div>
-                <ul className="space-y-2">
-                    <li className="px-6 py-3 hover:bg-blue-700">
-                        <a href="/dashboard" className="block">Dashboard</a>
-                    </li>
-                    <li className="px-6 py-3 hover:bg-blue-700">
-                        <a href="/reviews" className="block">View Reviews</a>
-                    </li>
-                    <li className="px-6 py-3 hover:bg-blue-700">
-                        <a href="/reports" className="block">Reports</a>
-                    </li>
-                </ul>
+  const renderStars = (rating) => {
+    return "⭐".repeat(rating) || "No rating";
+  };
+
+  if (loading) {
+    return <p className="text-center text-white">Loading reviews...</p>;
+  }
+
+  if (error) {
+    return <p className="text-center text-red-500">Error: {error}</p>;
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-blue-900 p-8">
+      <h2 className="text-3xl font-bold text-white text-center mb-6">Customer Reviews</h2>
+
+      {reviews.length === 0 ? (
+        <p className="text-center text-white text-opacity-80">No reviews available</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {reviews.map((review) => (
+            <div
+              key={review._id}
+              className="bg-white bg-opacity-10 backdrop-blur-md p-6 rounded-2xl shadow-2xl hover:bg-opacity-20 transition-all duration-300"
+            >
+              <h3 className="text-lg font-semibold text-white text-opacity-90">{review.title}</h3>
+              <p className="text-sm text-white text-opacity-70 mb-2">Customer: {review.uid}</p>
+              <p className="text-white text-opacity-90 mb-4">{review.review}</p>
+              <p className="text-yellow-400 font-bold">{renderStars(review.rating)}</p>
             </div>
-
-            {/* Main content */}
-            <div className="flex-1 p-8 bg-gray-100">
-                <h1 className="text-3xl font-bold text-gray-800 mb-6">Customer Reviews</h1>
-                {reviews.length === 0 ? (
-                    <p className="text-gray-600">No reviews available</p>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full bg-white shadow-md rounded">
-                            <thead>
-                                <tr className="bg-gray-200">
-                                    <th className="border px-4 py-2 text-left">Ticket Title</th>
-                                    <th className="border px-4 py-2 text-left">Customer Account</th>
-                                    <th className="border px-4 py-2 text-left">Review</th>
-                                    <th className="border px-4 py-2 text-left">Rating</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {reviews.map((review) => (
-                                    <tr key={review._id} className="hover:bg-gray-100">
-                                        <td className="border px-4 py-2">{review.title}</td>
-                                        <td className="border px-4 py-2">{review.uid}</td>
-                                        <td className="border px-4 py-2">{review.review}</td>
-                                        <td className="border px-4 py-2">{review.rating} / 5</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
+          ))}
         </div>
-    );
+      )}
+    </div>
+  );
 };
 
 export default ViewReviewsPage;

@@ -3,11 +3,11 @@ import axios from 'axios';
 
 const ReportPage = () => {
     const [companies, setCompanies] = useState([]);
-    const [selectedCompanyId, setSelectedCompanyId] = useState('');
+    const [selectedCompany, setSelectedCompany] = useState('');
     const [reportData, setReportData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [expandedStatus, setExpandedStatus] = useState(null);
+    const [expandedSections, setExpandedSections] = useState({});
 
     useEffect(() => {
         const fetchCompanies = async () => {
@@ -15,150 +15,192 @@ const ReportPage = () => {
                 const response = await axios.get('http://localhost:5000/api/auth/companies');
                 setCompanies(response.data);
             } catch (err) {
-                setError('Error fetching companies');
+                console.error('Error fetching companies:', err);
             }
         };
+
         fetchCompanies();
     }, []);
 
     useEffect(() => {
-        if (selectedCompanyId) {
-            const fetchReport = async () => {
-                setLoading(true);
-                try {
-                    const token = localStorage.getItem('token');
-                    const response = await axios.get(
-                        `http://localhost:5000/api/tickets/report?companyId=${selectedCompanyId}`,
-                        {
-                            headers: {
-                                'Authorization': `Bearer ${token}`
-                            }
-                        }
-                    );
-                    setReportData(response.data);
-                } catch (err) {
-                    if (err.response) {
-                        setError(err.response.data.message || JSON.stringify(err.response.data));
-                    } else if (err.request) {
-                        setError('No response from server');
-                    } else {
-                        setError('Error setting up the request');
-                    }
-                    console.error('Detailed fetch report error:', err);
-                } finally {
-                    setLoading(false);
+        if (selectedCompany) {
+            setLoading(true);
+            setError(null);
+
+            axios.get(`http://localhost:5000/api/tickets/report?companyId=${selectedCompany}`, {
+                headers: {
+                    Authorization: `Bearer ${localStorage.getItem('token')}`
                 }
-            };
-            fetchReport();
+            })
+            .then(res => {
+                setReportData(res.data);
+            })
+            .catch(err => {
+                console.error('Error fetching report data:', err);
+                setError('Failed to load report data');
+            })
+            .finally(() => setLoading(false));
         }
-    }, [selectedCompanyId]);
+    }, [selectedCompany]);
 
-    const handleCompanyChange = (event) => {
-        setSelectedCompanyId(event.target.value);
-        setReportData(null);
-        setError(null);
+    const toggleSection = (section) => {
+        setExpandedSections(prev => ({
+            ...prev,
+            [section]: !prev[section]
+        }));
     };
 
-    const formatBreakdownData = (data) => {
-        if (!data || typeof data !== 'object') return {};
-        
-        // Convert the data into an array of entries and sort them
-        return Object.entries(data).sort((a, b) => {
-            // Sort by value in descending order
-            return b[1] - a[1];
-        }).reduce((acc, [key, value]) => {
-            // Format the key to be more readable
-            const formattedKey = key.charAt(0).toUpperCase() + key.slice(1).toLowerCase();
-            acc[formattedKey] = value;
-            return acc;
-        }, {});
+    const renderStars = (rating) => {
+        return '★'.repeat(rating) + '☆'.repeat(5 - rating);
     };
 
-    const renderBreakdown = (data, title) => {
-        const formattedData = formatBreakdownData(data);
-        
-        return (
-            <div className="bg-white shadow rounded-lg p-4 mb-4">
-                <h3 className="text-lg font-semibold mb-3 border-b pb-2">{title}</h3>
-                {Object.entries(formattedData).map(([key, value]) => (
-                    <div key={key} className="flex justify-between py-1 border-b last:border-b-0">
-                        <span className="text-gray-700">{key}</span>
-                        <span className="font-medium">{value}</span>
-                    </div>
-                ))}
-            </div>
-        );
+    // Helper function to format the solving time
+    const formatSolvingTime = (time) => {
+        if (typeof time !== 'number' || isNaN(time)) return 'N/A';
+        return time.toFixed(1);
     };
 
     return (
-        <div className="p-6 bg-gray-100 min-h-screen">
-            <h1 className="text-2xl font-bold mb-6">Company Report</h1>
-
-            <div className="mb-6">
-                <label htmlFor="company-select" className="block mb-2 text-sm font-medium text-gray-700">
-                    Select a Company:
-                </label>
-                <select
-                    id="company-select"
-                    value={selectedCompanyId}
-                    onChange={handleCompanyChange}
-                    className="p-2 border rounded w-full focus:ring-2 focus:ring-blue-500"
-                >
-                    <option value="">-- Select a Company --</option>
-                    {companies.map((company) => (
-                        <option key={company.companyId} value={company.companyId}>
-                            {company.name}
-                        </option>
-                    ))}
-                </select>
-            </div>
-
-            {loading && (
-                <div className="text-center py-4 text-gray-600">
-                    Loading report data...
-                </div>
-            )}
-
-            {error && (
-                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-                    {error}
-                </div>
-            )}
-
-            {reportData && (
-                <div className="grid md:grid-cols-2 gap-4">
-                    <div className="bg-white shadow rounded-lg p-4">
-                        <h2 className="text-xl font-semibold mb-4 border-b pb-2">Overall Statistics</h2>
-                        <div className="space-y-2">
-                            <p className="flex justify-between">
-                                <span className="text-gray-700">Company:</span>
-                                <span className="font-medium">{reportData.companyName}</span>
-                            </p>
-                            <p className="flex justify-between">
-                                <span className="text-gray-700">Total Tickets:</span>
-                                <span className="font-medium">{reportData.totalTickets}</span>
-                            </p>
-                            <p className="flex justify-between">
-                                <span className="text-gray-700">Avg Resolution Time:</span>
-                                <span className="font-medium">{(reportData.avgResolutionTime / (1000 * 60 * 60)).toFixed(2)} hours</span>
-                            </p>
-                            <p className="flex justify-between">
-                                <span className="text-gray-700">Average Rating:</span>
-                                <span className="font-medium">
-                                    {reportData.reviewStats?.averageRating?.toFixed(2) || 'N/A'}
-                                </span>
-                            </p>
-                            <p className="flex justify-between">
-                                <span className="text-gray-700">Total Reviews:</span>
-                                <span className="font-medium">{reportData.reviewStats?.totalReviews || 0}</span>
-                            </p>
-                        </div>
+        <div className="flex h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-blue-900 overflow-hidden">
+            <div className="w-full p-8">
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between mb-6">
+                        <h1 className="text-2xl font-bold text-white">HelpDesk Report</h1>
+                        <select 
+                            value={selectedCompany} 
+                            onChange={(e) => setSelectedCompany(e.target.value)}
+                            className="p-2 rounded-lg bg-white bg-opacity-10 backdrop-blur-md text-white border border-white border-opacity-20 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-20"
+                        >
+                            <option value="" className="bg-indigo-900">Select a company</option>
+                            {companies.map(company => (
+                                <option key={company.companyId} value={company.companyId} className="bg-indigo-900">
+                                    {company.name}
+                                </option>
+                            ))}
+                        </select>
                     </div>
 
-                    {renderBreakdown(reportData.ticketsByStatus, 'Tickets by Status')}
-                    {renderBreakdown(reportData.ticketsByPriority, 'Tickets by Priority')}
+                    {loading && <p className="text-white text-opacity-80">Loading report...</p>}
+                    {error && <p className="text-red-400">{error}</p>}
+
+                    {reportData && (
+                        <div className="space-y-6">
+                            {/* Stats Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                <div className="bg-white bg-opacity-10 backdrop-blur-md p-6 rounded-2xl shadow-2xl">
+                                    <h3 className="text-lg font-semibold text-white text-opacity-80">Total Tickets</h3>
+                                    <p className="text-3xl font-bold text-white">{reportData.totalTickets || 0}</p>
+                                </div>
+                                <div className="bg-white bg-opacity-10 backdrop-blur-md p-6 rounded-2xl shadow-2xl">
+                                    <h3 className="text-lg font-semibold text-white text-opacity-80">Avg Response Time</h3>
+                                    <p className="text-3xl font-bold text-white">
+                                        {formatSolvingTime(reportData.avgSolvingTime)}h
+                                    </p>
+                                </div>
+                                <div className="bg-white bg-opacity-10 backdrop-blur-md p-6 rounded-2xl shadow-2xl">
+                                    <h3 className="text-lg font-semibold text-white text-opacity-80">Reviews</h3>
+                                    <p className="text-3xl font-bold text-white">{reportData.reviewCount || 0}</p>
+                                </div>
+                                <div className="bg-white bg-opacity-10 backdrop-blur-md p-6 rounded-2xl shadow-2xl">
+                                    <h3 className="text-lg font-semibold text-white text-opacity-80">Company</h3>
+                                    <p className="text-xl font-bold text-white">{reportData.companyName || 'N/A'}</p>
+                                </div>
+                            </div>
+
+                            {/* Expandable Sections */}
+                            {['status', 'priority', 'user', 'engineer'].map((section) => (
+                                <div key={section} className="bg-white bg-opacity-10 backdrop-blur-md rounded-2xl shadow-2xl overflow-hidden">
+                                    <div 
+                                        className="p-6 cursor-pointer flex justify-between items-center"
+                                        onClick={() => toggleSection(section)}
+                                    >
+                                        <h2 className="text-lg font-bold text-white">
+                                            Tickets by {section.charAt(0).toUpperCase() + section.slice(1)}
+                                        </h2>
+                                        <span className="text-white">{expandedSections[section] ? '▲' : '▼'}</span>
+                                    </div>
+                                    
+                                    {expandedSections[section] && (
+                                        <div className="px-6 pb-6">
+                                            <div className="bg-white bg-opacity-5 rounded-xl p-4 space-y-4">
+                                                {section === 'status' && reportData.ticketsByStatus && 
+                                                    Object.entries(reportData.ticketsByStatus || {}).map(([status, tickets]) => (
+                                                        <div key={status} className="text-white">
+                                                            <h3 className="font-semibold">{status}: {tickets.length} tickets</h3>
+                                                            <div className="ml-4 text-white text-opacity-80">
+                                                                {tickets.map(ticket => (
+                                                                    <p key={ticket.tid}>{ticket.title}</p>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                }
+                                                
+                                                {section === 'priority' && reportData.ticketsByPriority &&
+                                                    Object.entries(reportData.ticketsByPriority || {}).map(([priority, tickets]) => (
+                                                        <div key={priority} className="text-white">
+                                                            <h3 className="font-semibold">Priority {priority}: {tickets.length} tickets</h3>
+                                                            <div className="ml-4 text-white text-opacity-80">
+                                                                {tickets.map(ticket => (
+                                                                    <p key={ticket.tid}>{ticket.title}</p>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                }
+                                                
+                                                {section === 'user' && reportData.ticketsByUser &&
+                                                    (reportData.ticketsByUser || []).map(user => (
+                                                        <div key={user.uid} className="text-white">
+                                                            <h3 className="font-semibold">{user.name}: {user.tickets.length} tickets</h3>
+                                                            <div className="ml-4 text-white text-opacity-80">
+                                                                {user.tickets.map(ticket => (
+                                                                    <p key={ticket.tid}>{ticket.title}</p>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                }
+                                                
+                                                {section === 'engineer' && reportData.ticketsBySupportEngineer &&
+                                                    (reportData.ticketsBySupportEngineer || []).map(engineer => (
+                                                        <div key={engineer.uid} className="text-white">
+                                                            <h3 className="font-semibold">{engineer.name}: {engineer.tickets.length} tickets</h3>
+                                                            <div className="ml-4 text-white text-opacity-80">
+                                                                {engineer.tickets.map(ticket => (
+                                                                    <p key={ticket.tid}>{ticket.title}</p>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                }
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+
+                            {/* Reviews Section */}
+                            {reportData.reviews && reportData.reviews.length > 0 && (
+                                <div className="bg-white bg-opacity-10 backdrop-blur-md p-6 rounded-2xl shadow-2xl">
+                                    <h2 className="text-lg font-bold text-white mb-4">Reviews</h2>
+                                    <div className="space-y-3">
+                                        {reportData.reviews.map(review => (
+                                            <div key={review.tid} className="bg-white bg-opacity-5 p-4 rounded-xl">
+                                                <p className="text-white">
+                                                    <span className="font-semibold">{review.customerName}</span>
+                                                    <span className="text-yellow-400 ml-2">{renderStars(review.rating)}</span>
+                                                </p>
+                                                <p className="text-white text-opacity-80 mt-1">{review.review}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
-            )}
+            </div>
         </div>
     );
 };

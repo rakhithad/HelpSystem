@@ -174,161 +174,95 @@ router.get('/tickets-by-status', async (req, res) => {
 });
 
 
+// GET report data for a company
 router.get('/report', authenticateToken, async (req, res) => {
     try {
         const { companyId } = req.query;
+        if (!companyId) return res.status(400).json({ error: 'Company ID is required' });
 
-        if (!companyId) {
-            return res.status(400).json({ message: 'Company ID is required' });
-        }
+        const company = await Company.findOne({ companyId });
+        if (!company) return res.status(404).json({ error: 'Company not found' });
 
-        // Find all users in the company
-        const companyUsers = await User.find({ companyId });
-        const userIds = companyUsers.map(user => user.uid);
+        const users = await User.find({ companyId }).select('uid firstName lastName role');
+        const userIds = users.map(user => user.uid);
 
-        // Aggregate ticket report
-        const reportData = await Ticket.aggregate([
-            // Match tickets for the specific company's users
-            { $match: { uid: { $in: userIds } } },
+        const tickets = await Ticket.find({ uid: { $in: userIds } });
 
-            // Group and calculate statistics
-            {
-                $group: {
-                    _id: null,
-                    totalTickets: { $sum: 1 },
-                    
-                    // Collect all statuses and priorities
-                    allStatuses: { $push: "$status" },
-                    allPriorities: { $push: "$priority" },
-
-                    // Average Resolution Time
-                    avgResolutionTime: { 
-                        $avg: { 
-                            $subtract: ['$updatedAt', '$createdAt'] 
-                        } 
-                    },
-
-                    // Reviews and Ratings
-                    ratings: { 
-                        $push: { 
-                            $cond: [
-                                { $ne: ["$rating", null] },
-                                "$rating",
-                                "$$REMOVE"
-                            ]
-                        }
-                    },
-                    reviews: {
-                        $push: {
-                            $cond: [
-                                { $ne: ["$review", null] },
-                                "$review",
-                                "$$REMOVE"
-                            ]
-                        }
-                    }
-                }
-            },
-
-            // Process the grouped data
-            {
-                $project: {
-                    _id: 0,
-                    totalTickets: 1,
-                    avgResolutionTime: { $round: ['$avgResolutionTime', 2] },
-
-                    // Calculate status counts
-                    ticketsByStatus: {
-                        $arrayToObject: {
-                            $map: {
-                                input: {
-                                    $setUnion: ["$allStatuses"]
-                                },
-                                as: "status",
-                                in: {
-                                    k: "$$status",
-                                    v: {
-                                        $size: {
-                                            $filter: {
-                                                input: "$allStatuses",
-                                                cond: { $eq: ["$$this", "$$status"] }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-
-                    // Calculate priority counts
-                    ticketsByPriority: {
-                        $arrayToObject: {
-                            $map: {
-                                input: {
-                                    $setUnion: ["$allPriorities"]
-                                },
-                                as: "priority",
-                                in: {
-                                    k: { $toString: "$$priority" },
-                                    v: {
-                                        $size: {
-                                            $filter: {
-                                                input: "$allPriorities",
-                                                cond: { $eq: ["$$this", "$$priority"] }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-
-                    // Calculate review statistics
-                    reviewStats: {
-                        averageRating: { $avg: "$ratings" },
-                        totalReviews: { $size: "$reviews" }
-                    }
-                }
-            }
-        ]);
-
-        // If no tickets found for the company
-        if (reportData.length === 0) {
+        if (!tickets.length) {
             return res.json({
-                companyName: 'Unknown Company',
+                companyName: company.name,
                 totalTickets: 0,
+                avgSolvingTime: 0,
+                reviewCount: 0,
                 ticketsByStatus: {},
                 ticketsByPriority: {},
-                avgResolutionTime: 0,
-                reviewStats: {
-                    averageRating: 0,
-                    totalReviews: 0
-                }
+                ticketsByUser: [],
+                ticketsBySupportEngineer: [],
+                reviews: []
             });
         }
 
-        // Get company details
-        const company = await Company.findOne({ companyId });
+        const totalTickets = tickets.length;
+        const solvedTickets = tickets.filter(ticket => ticket.status === 'done');
 
-        // Combine all report data
-        const finalReport = {
-            companyName: company ? company.name : 'Unknown Company',
-            ...reportData[0]
-        };
+        const avgSolvingTime = solvedTickets.length > 0
+            ? (solvedTickets.reduce((sum, ticket) => sum + ((new Date(ticket.updatedAt) - new Date(ticket.createdAt)) / 3600000), 0) / solvedTickets.length).toFixed(2)
+            : 0;
 
-        res.json(finalReport);
+        const reviewCount = tickets.filter(ticket => ticket.review !== null).length;
+
+        const ticketsByStatus = tickets.reduce((acc, ticket) => {
+            acc[ticket.status] = acc[ticket.status] || [];
+            acc[ticket.status].push(ticket);
+            return acc;
+        }, {});
+
+        const ticketsByPriority = tickets.reduce((acc, ticket) => {
+            acc[ticket.priority] = acc[ticket.priority] || [];
+            acc[ticket.priority].push(ticket);
+            return acc;
+        }, {});
+
+        const ticketsByUser = users.map(user => ({
+            uid: user.uid,
+            name: `${user.firstName} ${user.lastName}`,
+            tickets: tickets.filter(ticket => ticket.uid === user.uid)
+        }));
+
+        const ticketsBySupportEngineer = users
+            .filter(user => user.role === 'support_engineer')
+            .map(engineer => ({
+                uid: engineer.uid,
+                name: `${engineer.firstName} ${engineer.lastName}`,
+                tickets: tickets.filter(ticket => ticket.assignedSupportEngineer === engineer.uid)
+            }));
+
+        const reviews = tickets
+            .filter(ticket => ticket.review !== null)
+            .map(ticket => ({
+                tid: ticket.tid,
+                customerName: users.find(user => user.uid === ticket.uid)?.firstName || 'Unknown',
+                review: ticket.review,
+                rating: ticket.rating
+            }));
+
+        res.json({
+            companyName: company.name,
+            totalTickets,
+            avgSolvingTime,
+            reviewCount,
+            ticketsByStatus,
+            ticketsByPriority,
+            ticketsByUser,
+            ticketsBySupportEngineer,
+            reviews
+        });
 
     } catch (error) {
-        console.error('Report Generation Error:', error);
-        res.status(500).json({ 
-            message: 'Error generating report', 
-            error: error.message,
-            details: error.toString() 
-        });
+        console.error('Error fetching report data:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
     }
 });
-
-
 
 // Add review and rating to a ticket
 router.post('/review/:ticketId', authenticateToken, async (req, res) => {
@@ -362,7 +296,7 @@ router.post('/review/:ticketId', authenticateToken, async (req, res) => {
 
 
 // Fetch all reviews
-router.get('/reviews', authenticateToken, async (req, res) => {
+router.get('/reviews', async (req, res) => {
     try {
         const reviews = await Ticket.find(
             { review: { $exists: true }, rating: { $exists: true } }, // Fetch only tickets with reviews and ratings

@@ -1,45 +1,49 @@
-import React from 'react'; 
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
 
     return (
-        <div className="flex min-h-screen bg-gray-100">
-            
-            <div className="flex-grow ml-64 p-6">
-                <h1 className="text-3xl font-bold mb-8 text-gray-800">Admin Dashboard</h1>
-                <div className="space-y-6">
-                    <button
-                        className="w-full bg-blue-500 text-white p-4 rounded-md shadow-lg hover:bg-blue-600 transition duration-300 ease-in-out"
-                        onClick={() => navigate('/manage-users')}
-                    >
-                        Manage Users
-                    </button>
-                    <button
-                        className="w-full bg-blue-500 text-white p-4 rounded-md shadow-lg hover:bg-blue-600 transition duration-300 ease-in-out"
-                        onClick={() => navigate('/manage-tickets')}
-                    >
-                        Manage Tickets
-                    </button>
-                    <button
-                        className="w-full bg-green-500 text-white p-4 rounded-md shadow-lg hover:bg-green-600 transition duration-300 ease-in-out"
-                        onClick={() => navigate('/register')}
-                    >
-                        Add User
-                    </button>
-                    <button
-                        className="w-full bg-gray-500 text-white p-4 rounded-md shadow-lg hover:bg-gray-600 transition duration-300 ease-in-out"
-                        onClick={() => navigate('/report')}
-                    >
-                        Report
-                    </button>
-                    <button
-                        className="w-full bg-gray-500 text-white p-4 rounded-md shadow-lg hover:bg-gray-600 transition duration-300 ease-in-out"
-                        onClick={() => navigate('/dashboard')}
-                    >
-                        Back to Dashboard
-                    </button>
+        <div className="flex min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-blue-900 overflow-hidden">
+            {/* Sidebar is assumed to be rendered here */}
+            <div className="ml-64 w-full p-8">
+                <div className="space-y-8">
+                    <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-300">
+                        Admin Dashboard
+                    </h1>
+                    <div className="space-y-6">
+                        <button
+                            className="w-full px-6 py-4 bg-white bg-opacity-10 backdrop-blur-md text-white text-lg font-semibold rounded-2xl shadow-2xl hover:bg-opacity-20 transition-all duration-300"
+                            onClick={() => navigate('/manage-users')}
+                        >
+                            Manage Users
+                        </button>
+                        <button
+                            className="w-full px-6 py-4 bg-white bg-opacity-10 backdrop-blur-md text-white text-lg font-semibold rounded-2xl shadow-2xl hover:bg-opacity-20 transition-all duration-300"
+                            onClick={() => navigate('/manage-tickets')}
+                        >
+                            Manage Tickets
+                        </button>
+                        <button
+                            className="w-full px-6 py-4 bg-white bg-opacity-10 backdrop-blur-md text-white text-lg font-semibold rounded-2xl shadow-2xl hover:bg-opacity-20 transition-all duration-300"
+                            onClick={() => navigate('/register')}
+                        >
+                            Add User
+                        </button>
+                        <button
+                            className="w-full px-6 py-4 bg-white bg-opacity-10 backdrop-blur-md text-white text-lg font-semibold rounded-2xl shadow-2xl hover:bg-opacity-20 transition-all duration-300"
+                            onClick={() => navigate('/report')}
+                        >
+                            Report
+                        </button>
+                        <button
+                            className="w-full px-6 py-4 bg-white bg-opacity-10 backdrop-blur-md text-white text-lg font-semibold rounded-2xl shadow-2xl hover:bg-opacity-20 transition-all duration-300"
+                            onClick={() => navigate('/dashboard')}
+                        >
+                            Back to Dashboard
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

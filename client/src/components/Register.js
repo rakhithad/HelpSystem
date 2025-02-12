@@ -49,7 +49,6 @@ const Register = () => {
             });
             alert('User registered successfully');
 
-            // Reset the form fields
             setUsername('');
             setPassword('');
             setFirstName('');
@@ -69,99 +68,111 @@ const Register = () => {
         navigate('/create-company');
     };
 
+    const inputClasses = "w-full p-3 bg-white bg-opacity-10 border border-white border-opacity-20 rounded-lg text-white placeholder-white placeholder-opacity-60 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all duration-300";
+    
     return (
-        <div className="ml-64 p-8 h-screen bg-gray-100"> {/* Adjust to account for the Sidebar */}
-            <div className="bg-white shadow rounded-lg p-8 max-w-lg mx-auto">
-                <h1 className="text-2xl font-bold text-gray-800 mb-6">Register</h1>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <input
-                        type="text"
-                        placeholder="Username"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        required
-                        className="w-full p-2 border border-gray-300 rounded"
-                    />
-                    <input
-                        type="password"
-                        placeholder="Password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        className="w-full p-2 border border-gray-300 rounded"
-                    />
-                    <input
-                        type="text"
-                        placeholder="First Name"
-                        value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded"
-                    />
-                    <input
-                        type="text"
-                        placeholder="Last Name"
-                        value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded"
-                    />
-                    <input
-                        type="text"
-                        placeholder="Phone Number"
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded"
-                    />
-                    <input
-                        type="text"
-                        placeholder="Location"
-                        value={location}
-                        onChange={(e) => setLocation(e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded"
-                    />
-
-                    <select
-                        value={role}
-                        onChange={(e) => setRole(e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded"
-                    >
-                        <option value="customer">Customer</option>
-                        <option value="admin">Admin</option>
-                        <option value="support_engineer">Support Engineer</option>
-                    </select>
-
-                    {showCompanyDropdown && (
-                        <select
-                            value={companyId}
-                            onChange={(e) => setCompanyId(e.target.value)}
+        <div className="flex h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-blue-900">
+            <div className="ml-64 w-full p-8 flex items-center justify-center">
+                <div className="w-full max-w-lg bg-white bg-opacity-10 backdrop-blur-md rounded-2xl shadow-2xl p-8">
+                    <h1 className="text-3xl font-bold text-white text-opacity-90 mb-8">Register</h1>
+                    
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <input
+                            type="text"
+                            placeholder="Username"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
                             required
-                            className="w-full p-2 border border-gray-300 rounded"
+                            className={inputClasses}
+                        />
+                        
+                        <input
+                            type="password"
+                            placeholder="Password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                            className={inputClasses}
+                        />
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                            <input
+                                type="text"
+                                placeholder="First Name"
+                                value={firstName}
+                                onChange={(e) => setFirstName(e.target.value)}
+                                className={inputClasses}
+                            />
+                            
+                            <input
+                                type="text"
+                                placeholder="Last Name"
+                                value={lastName}
+                                onChange={(e) => setLastName(e.target.value)}
+                                className={inputClasses}
+                            />
+                        </div>
+                        
+                        <input
+                            type="text"
+                            placeholder="Phone Number"
+                            value={phoneNumber}
+                            onChange={(e) => setPhoneNumber(e.target.value)}
+                            className={inputClasses}
+                        />
+                        
+                        <input
+                            type="text"
+                            placeholder="Location"
+                            value={location}
+                            onChange={(e) => setLocation(e.target.value)}
+                            className={inputClasses}
+                        />
+
+                        <select
+                            value={role}
+                            onChange={(e) => setRole(e.target.value)}
+                            className={inputClasses}
                         >
-                            <option value="">Select a Company</option>
-                            {companies.map((company) => (
-                                <option key={company.companyId} value={company.companyId}>
-                                    {company.name}
-                                </option>
-                            ))}
+                            <option value="customer" className="bg-indigo-900">Customer</option>
+                            <option value="admin" className="bg-indigo-900">Admin</option>
+                            <option value="support_engineer" className="bg-indigo-900">Support Engineer</option>
                         </select>
-                    )}
 
-                    {role === 'customer' && (
+                        {showCompanyDropdown && (
+                            <select
+                                value={companyId}
+                                onChange={(e) => setCompanyId(e.target.value)}
+                                required
+                                className={inputClasses}
+                            >
+                                <option value="" className="bg-indigo-900">Select a Company</option>
+                                {companies.map((company) => (
+                                    <option key={company.companyId} value={company.companyId} className="bg-indigo-900">
+                                        {company.name}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+
+                        {role === 'customer' && (
+                            <button
+                                type="button"
+                                onClick={handleCreateCompany}
+                                className="text-white text-opacity-80 hover:text-opacity-100 hover:underline transition-all duration-300"
+                            >
+                                No Companies Found? Create a New Company
+                            </button>
+                        )}
+
                         <button
-                            type="button"
-                            onClick={handleCreateCompany}
-                            className="text-sm text-blue-500 hover:underline"
+                            type="submit"
+                            className="w-full bg-purple-600 bg-opacity-80 hover:bg-opacity-100 text-white py-3 rounded-lg transition-all duration-300 transform hover:scale-[1.02]"
                         >
-                            No Companies Found? Create a New Company
+                            Register
                         </button>
-                    )}
-
-                    <button
-                        type="submit"
-                        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
-                    >
-                        Register
-                    </button>
-                </form>
+                    </form>
+                </div>
             </div>
         </div>
     );
