@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
+import { Link } from 'react-router-dom';
+
 
 const CreateTicket = () => {
     const [formData, setFormData] = useState({
@@ -60,6 +62,11 @@ const CreateTicket = () => {
                     <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-300 mb-6">
                         Create a New Ticket
                     </h2>
+                    <nav className="text-white text-opacity-80 mb-4">
+                        <Link to="/dashboard" className="hover:underline">Dashboard</Link> {' / '}
+                        <span className="text-purple-300">Create a ticket</span>
+                    </nav>
+
                     {error && (
                         <p className="text-red-400 bg-white bg-opacity-10 backdrop-blur-md p-3 rounded-lg mb-4">
                             {error}

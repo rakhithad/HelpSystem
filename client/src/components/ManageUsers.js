@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Link } from 'react-router-dom';
 
 const ManageUsers = () => {
     const [users, setUsers] = useState([]);
@@ -59,6 +60,14 @@ const ManageUsers = () => {
             <div className="ml-64 w-full p-8">
                 <div className="space-y-8">
                     <h1 className="text-2xl font-bold text-white text-opacity-90">Manage Users</h1>
+
+                    <nav className="text-white text-opacity-80 mb-4">
+                        <Link to="/dashboard" className="hover:underline">Dashboard</Link> {' / '}
+                        <Link to="/admin-dashboard" className="hover:underline">Admin Dashboard</Link> {' / '}
+                        <span className="text-purple-300">Manage Users</span>
+                    </nav>
+
+
                     
                     <div className="overflow-x-auto bg-white bg-opacity-10 backdrop-blur-md rounded-2xl shadow-2xl max-h-[80vh]">
                         <table className="min-w-full table-auto text-sm text-left text-white text-opacity-90">

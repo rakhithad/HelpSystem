@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 const Register = () => {
     const [username, setUsername] = useState('');
@@ -75,6 +75,13 @@ const Register = () => {
             <div className="ml-64 w-full p-8 flex items-center justify-center">
                 <div className="w-full max-w-lg bg-white bg-opacity-10 backdrop-blur-md rounded-2xl shadow-2xl p-8">
                     <h1 className="text-3xl font-bold text-white text-opacity-90 mb-8">Register</h1>
+
+
+                    <nav className="text-white text-opacity-80 mb-4">
+                                            <Link to="/dashboard" className="hover:underline">Dashboard</Link> {' / '}
+                                            <Link to="/admin-dashboard" className="hover:underline">Admin Dashboard</Link> {' / '}
+                                            <span className="text-purple-300">Add a user</span>
+                                        </nav>
                     
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <input

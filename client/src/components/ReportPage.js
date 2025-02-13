@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Link } from 'react-router-dom';
 
 const ReportPage = () => {
     const [companies, setCompanies] = useState([]);
@@ -66,6 +67,15 @@ const ReportPage = () => {
                 <div className="space-y-6">
                     <div className="flex items-center justify-between mb-6">
                         <h1 className="text-2xl font-bold text-white">HelpDesk Report</h1>
+
+                        <nav className="text-white text-opacity-80 mb-4">
+                            <Link to="/dashboard" className="hover:underline">Dashboard</Link> {' / '}
+                            <Link to="/admin-dashboard" className="hover:underline">Admin Dashboard</Link> {' / '}
+                            <span className="text-purple-300">Report Page</span>
+                        </nav>
+
+
+
                         <select 
                             value={selectedCompany} 
                             onChange={(e) => setSelectedCompany(e.target.value)}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -12,6 +12,12 @@ const AdminDashboard = () => {
                     <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-300">
                         Admin Dashboard
                     </h1>
+
+                    <nav className="text-white text-opacity-80 mb-4">
+                        <Link to="/dashboard" className="hover:underline">Dashboard</Link> {' / '}
+                        <span className="text-purple-300">Admin dashboard</span>
+                    </nav>
+                    
                     <div className="space-y-6">
                         <button
                             className="w-full px-6 py-4 bg-white bg-opacity-10 backdrop-blur-md text-white text-lg font-semibold rounded-2xl shadow-2xl hover:bg-opacity-20 transition-all duration-300"
@@ -37,12 +43,7 @@ const AdminDashboard = () => {
                         >
                             Report
                         </button>
-                        <button
-                            className="w-full px-6 py-4 bg-white bg-opacity-10 backdrop-blur-md text-white text-lg font-semibold rounded-2xl shadow-2xl hover:bg-opacity-20 transition-all duration-300"
-                            onClick={() => navigate('/dashboard')}
-                        >
-                            Back to Dashboard
-                        </button>
+                        
                     </div>
                 </div>
             </div>

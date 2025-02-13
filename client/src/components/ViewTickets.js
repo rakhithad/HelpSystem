@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 
 const ViewTickets = () => {
@@ -7,15 +8,12 @@ const ViewTickets = () => {
     const [selectedStatus, setSelectedStatus] = useState('');
     const [error, setError] = useState(null);
 
-    // Retrieve the role from localStorage
     const userRole = localStorage.getItem('role');
 
     useEffect(() => {
         const fetchData = async () => {
             try {
                 const token = localStorage.getItem('token');
-
-                // Fetch tickets
                 const ticketsResponse = await axios.get('http://localhost:5000/api/tickets/view-tickets', {
                     headers: { Authorization: `Bearer ${token}` },
                 });
@@ -30,7 +28,6 @@ const ViewTickets = () => {
         fetchData();
     }, []);
 
-    // Filter tickets by status
     useEffect(() => {
         const filtered = selectedStatus
             ? tickets.filter((ticket) => ticket.status === selectedStatus)
@@ -40,7 +37,6 @@ const ViewTickets = () => {
 
     if (error) return <div>{error}</div>;
 
-    // Function to determine the background color for status box
     const getStatusColor = (status) => {
         switch (status) {
             case 'not started':
@@ -56,7 +52,6 @@ const ViewTickets = () => {
         }
     };
 
-    // Function to determine review status (Reviewed or To be Reviewed)
     const getReviewStatus = (ticket) => {
         if (ticket.status === 'done') {
             return ticket.review ? 'Reviewed' : 'To be Reviewed';
@@ -66,14 +61,20 @@ const ViewTickets = () => {
 
     return (
         <div className="flex min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-blue-900 overflow-hidden">
-            {/* Sidebar is assumed to be rendered here */}
             <div className="ml-64 w-full p-8">
                 <div className="space-y-8">
+                    
+                    
+
                     <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-300">
                         View Tickets
                     </h1>
 
-                    {/* Filters */}
+                    <nav className="text-white text-opacity-80 mb-4">
+                        <Link to="/dashboard" className="hover:underline">Dashboard</Link> {' / '}
+                        <span className="text-purple-300">View Tickets</span>
+                    </nav>
+
                     <div className="flex items-center space-x-4">
                         <label className="text-white text-opacity-80">Filter by Status:</label>
                         <select
@@ -89,7 +90,6 @@ const ViewTickets = () => {
                         </select>
                     </div>
 
-                    {/* Tickets List as a table */}
                     <div className="overflow-x-auto bg-white bg-opacity-10 backdrop-blur-md rounded-2xl shadow-2xl">
                         <table className="min-w-full text-sm text-left text-white text-opacity-90">
                             <thead>
@@ -118,7 +118,6 @@ const ViewTickets = () => {
                                             <td className="border-t border-white border-opacity-10 px-6 py-4">{ticket.priority}</td>
                                             <td className="border-t border-white border-opacity-10 px-6 py-4">{ticket.uid}</td>
                                             <td className="border-t border-white border-opacity-10 px-6 py-4">
-                                                {/* Display the review status if the ticket is done */}
                                                 {userRole !== 'customer' && ticket.status === 'done' ? (
                                                     <div>{getReviewStatus(ticket)}</div>
                                                 ) : (

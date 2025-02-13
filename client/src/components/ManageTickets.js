@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Link } from 'react-router-dom';
 
 const ManageTickets = () => {
     const [tickets, setTickets] = useState([]);
@@ -119,6 +120,12 @@ const ManageTickets = () => {
                     <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-300">
                         Manage Tickets
                     </h1>
+
+                    <nav className="text-white text-opacity-80 mb-4">
+                                            <Link to="/dashboard" className="hover:underline">Dashboard</Link> {' / '}
+                                            <Link to="/admin-dashboard" className="hover:underline">Admin Dashboard</Link> {' / '}
+                                            <span className="text-purple-300">Manage Tickets</span>
+                                        </nav>
 
                     {/* Filters */}
                     <div className="filters p-6 bg-white bg-opacity-10 backdrop-blur-md rounded-2xl shadow-2xl">
