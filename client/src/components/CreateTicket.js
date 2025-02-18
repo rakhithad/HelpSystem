@@ -40,7 +40,7 @@ const CreateTicket = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post('http://localhost:5000/api/tickets', {
+            const response = await axios.post(`${process.env.REACT_APP_BACKEND_BASEURL}/tickets`, {
                 ...formData,
                 uid: uid,
             });

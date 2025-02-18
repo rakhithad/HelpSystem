@@ -23,5 +23,6 @@ yarn-debug.log*
 yarn-error.log*
 
 
-# local files
-backend/.env
+/backend/.env
+
+/frontend/.env
