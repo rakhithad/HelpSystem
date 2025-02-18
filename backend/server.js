@@ -7,7 +7,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors({
-    origin: 'https://help-system-ochre.vercel.app', // Allow only your frontend URL
+    origin: ['https://help-system-ochre.vercel.app', 'https://help-system-c149ct6ov-rakhithas-projects.vercel.app'],
     credentials: true, // Allow cookies if you're using them
   }))
 app.use(express.json());
