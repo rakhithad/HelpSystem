@@ -13,7 +13,7 @@ const ReportPage = () => {
     useEffect(() => {
         const fetchCompanies = async () => {
             try {
-                const response = await axios.get('http://localhost:5000/api/auth/companies');
+                const response = await axios.get(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/companies`);
                 setCompanies(response.data);
             } catch (err) {
                 console.error('Error fetching companies:', err);
@@ -28,7 +28,7 @@ const ReportPage = () => {
             setLoading(true);
             setError(null);
 
-            axios.get(`http://localhost:5000/api/tickets/report?companyId=${selectedCompany}`, {
+            axios.get(`${process.env.REACT_APP_BACKEND_BASEURL}/tickets/report?companyId=${selectedCompany}`, {
                 headers: {
                     Authorization: `Bearer ${localStorage.getItem('token')}`
                 }

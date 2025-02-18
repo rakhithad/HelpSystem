@@ -14,7 +14,7 @@ const ViewTickets = () => {
         const fetchData = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const ticketsResponse = await axios.get('http://localhost:5000/api/tickets/view-tickets', {
+                const ticketsResponse = await axios.get(`${process.env.REACT_APP_BACKEND_BASEURL}/tickets/view-tickets`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 setTickets(ticketsResponse.data);

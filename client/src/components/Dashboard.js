@@ -31,7 +31,7 @@ const Dashboard = () => {
     useEffect(() => {
         const fetchTicketCounts = async () => {
             try {
-                const response = await axios.get('http://localhost:5000/api/tickets/ticket-counts', {
+                const response = await axios.get(`${process.env.REACT_APP_BACKEND_BASEURL}/tickets/ticket-counts`, {
                     headers: { role, uid }
                 });
                 setTicketCounts(response.data);
@@ -52,7 +52,7 @@ const Dashboard = () => {
         } else {
             try {
                 const response = await axios.get(
-                    `http://localhost:5000/api/tickets/tickets-by-status?type=${type}`,
+                    `${process.env.REACT_APP_BACKEND_BASEURL}/tickets/tickets-by-status?type=${type}`,
                     {
                         headers: { role, uid }
                     }

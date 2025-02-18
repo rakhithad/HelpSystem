@@ -11,7 +11,7 @@ const CreateCompany = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const response = await axios.post('http://localhost:5000/api/auth/create-company', {
+            const response = await axios.post(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/create-company`, {
                 name,
                 address,
                 phoneNumber,

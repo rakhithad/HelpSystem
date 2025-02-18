@@ -14,7 +14,7 @@ const Login = () => {
             const lowerCaseUsername = username.toLowerCase();
             const lowerCasePassword = password.toLowerCase();
 
-            const response = await axios.post('http://localhost:5000/api/auth/login', {
+            const response = await axios.post(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/login`, {
                 username: lowerCaseUsername,
                 password: lowerCasePassword,
             });

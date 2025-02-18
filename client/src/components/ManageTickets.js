@@ -15,7 +15,7 @@ const ManageTickets = () => {
             try {
                 const token = localStorage.getItem('token');
 
-                const ticketsResponse = await axios.get('http://localhost:5000/api/tickets/view-tickets', {
+                const ticketsResponse = await axios.get(`${process.env.REACT_APP_BACKEND_BASEURL}/tickets/view-tickets`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 setTickets(ticketsResponse.data);
@@ -24,7 +24,7 @@ const ManageTickets = () => {
                 const companyNames = [...new Set(ticketsResponse.data.map((ticket) => ticket.company))];
                 setCompanies(companyNames);
 
-                const engineersResponse = await axios.get('http://localhost:5000/api/auth/support-engineers', {
+                const engineersResponse = await axios.get(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/support-engineers`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 setSupportEngineers(engineersResponse.data);
@@ -80,7 +80,7 @@ const ManageTickets = () => {
         try {
             const token = localStorage.getItem('token');
             const response = await axios.put(
-                `http://localhost:5000/api/tickets/update-ticket/${ticketId}`,
+                `${process.env.REACT_APP_BACKEND_BASEURL}/tickets/update-ticket/${ticketId}`,
                 updates,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -99,7 +99,7 @@ const ManageTickets = () => {
     const handleDeleteTicket = async (ticketId) => {
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:5000/api/tickets/delete-ticket/${ticketId}`, {
+            await axios.delete(`${process.env.REACT_APP_BACKEND_BASEURL}/tickets/delete-ticket/${ticketId}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
 

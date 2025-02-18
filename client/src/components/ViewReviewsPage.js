@@ -11,7 +11,7 @@ const ViewReviewsPage = () => {
       try {
         
         const response = await axios.get(
-          "http://localhost:5000/api/tickets/reviews",
+          `${process.env.REACT_APP_BACKEND_BASEURL}/tickets/reviews`,
           
         );
 

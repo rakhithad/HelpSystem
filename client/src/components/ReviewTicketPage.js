@@ -13,7 +13,7 @@ const ReviewTicketPage = () => {
         try {
             const token = localStorage.getItem('token');
             await axios.post(
-                `http://localhost:5000/api/tickets/review/${ticketId}`,
+                `${process.env.REACT_APP_BACKEND_BASEURL}/tickets/review/${ticketId}`,
                 { review, rating },
                 { headers: { Authorization: `Bearer ${token}` } }
             );

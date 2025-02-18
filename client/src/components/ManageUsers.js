@@ -11,7 +11,7 @@ const ManageUsers = () => {
         const fetchUsers = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const response = await axios.get('http://localhost:5000/api/auth/users', {
+                const response = await axios.get(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/users`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 setUsers(response.data);
@@ -30,7 +30,7 @@ const ManageUsers = () => {
     const handleSave = async () => {
         try {
             const token = localStorage.getItem('token');
-            await axios.put(`http://localhost:5000/api/auth/users/${editingUserId}`, editedUser, {
+            await axios.put(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/users/${editingUserId}`, editedUser, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setEditingUserId(null);

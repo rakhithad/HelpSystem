@@ -19,7 +19,7 @@ const Register = () => {
         const fetchCompanies = async () => {
             if (role === 'customer') {
                 try {
-                    const response = await axios.get('http://localhost:5000/api/auth/companies');
+                    const response = await axios.get(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/companies`);
                     setCompanies(response.data);
                     setShowCompanyDropdown(response.data.length > 0);
                 } catch (error) {
@@ -37,7 +37,7 @@ const Register = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            await axios.post('http://localhost:5000/api/auth/register', {
+            await axios.post(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/register`, {
                 username: username.toLowerCase(),
                 password,
                 firstName: firstName.toLowerCase(),
