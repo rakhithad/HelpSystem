@@ -80,6 +80,7 @@ const ManageUsers = () => {
                                     <th className="px-6 py-3">Role</th>
                                     <th className="px-6 py-3">Phone</th>
                                     <th className="px-6 py-3">Location</th>
+                                    <th className="px-6 py-3">Avatar</th>
                                     <th className="px-6 py-3">Actions</th>
                                 </tr>
                             </thead>
@@ -149,6 +150,18 @@ const ManageUsers = () => {
                                                 />
                                             ) : (
                                                 user.location
+                                            )}
+                                        </td>
+                                        <td className="border-t border-white border-opacity-10 px-6 py-4">
+                                            {editingUserId === user._id ? (
+                                                <input
+                                                    type="text"
+                                                    value={editedUser.avatar || ''}
+                                                    onChange={(e) => setEditedUser({ ...editedUser, avatar: e.target.value })}
+                                                    className="bg-white bg-opacity-20 text-white p-2 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                                />
+                                            ) : (
+                                                user.avatar
                                             )}
                                         </td>
                                         <td className="border-t border-white border-opacity-10 px-6 py-4">

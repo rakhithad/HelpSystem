@@ -9,6 +9,7 @@ const AccountPage = () => {
         email: '',
         phoneNumber: '',
         location: '',
+        avatar: ''
     });
     const [isEditing, setIsEditing] = useState(false);
 
@@ -105,6 +106,17 @@ const AccountPage = () => {
                             type="text"
                             name="location"
                             value={userDetails.location}
+                            onChange={handleChange}
+                            readOnly={!isEditing}
+                            className={`w-full p-3 mt-1 border rounded-lg bg-white bg-opacity-20 text-white text-opacity-90 focus:ring focus:ring-indigo-500 ${isEditing ? 'focus:outline-none' : 'cursor-not-allowed'}`}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-white text-opacity-80">Avatar</label>
+                        <input
+                            type="text"
+                            name="avatar"
+                            value={userDetails.avatar}
                             onChange={handleChange}
                             readOnly={!isEditing}
                             className={`w-full p-3 mt-1 border rounded-lg bg-white bg-opacity-20 text-white text-opacity-90 focus:ring focus:ring-indigo-500 ${isEditing ? 'focus:outline-none' : 'cursor-not-allowed'}`}

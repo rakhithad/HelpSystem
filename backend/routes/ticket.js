@@ -9,10 +9,10 @@ const router = express.Router();
 
 router.post('/', async (req, res) => {
     try {
-        const { account, title, description, priority, uid } = req.body;
+        const {  title, description, priority, uid } = req.body;
 
         // Validate required fields
-        if (!account || !title || !description || !priority|| !uid) {
+        if ( !title || !description || !priority|| !uid) {
             return res.status(400).json({ message: 'Missing required fields' });
         }
 
@@ -34,7 +34,6 @@ router.post('/', async (req, res) => {
         // Create and save the new ticket
         const newTicket = new Ticket({
             tid,
-            account,
             title,
             description,
             priority,

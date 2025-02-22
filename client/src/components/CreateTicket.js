@@ -6,7 +6,6 @@ import { Link } from 'react-router-dom';
 
 const CreateTicket = () => {
     const [formData, setFormData] = useState({
-        account: '',
         title: '',
         description: '',
         priority: 1,
@@ -47,7 +46,7 @@ const CreateTicket = () => {
             console.log(response);
             setSuccess('Ticket created successfully!');
             setError('');
-            setFormData({ account: '', title: '', description: '', priority: 1 });
+            setFormData({ title: '', description: '', priority: 1 });
         } catch (err) {
             setError('Failed to create ticket. Please try again.');
             setSuccess('');
@@ -78,17 +77,6 @@ const CreateTicket = () => {
                         </p>
                     )}
                     <form onSubmit={handleSubmit} className="bg-white bg-opacity-10 backdrop-blur-md p-8 rounded-2xl shadow-2xl">
-                        <div className="mb-6">
-                            <label className="block text-white text-opacity-80 font-semibold mb-2">Account:</label>
-                            <input
-                                type="text"
-                                name="account"
-                                value={formData.account || ''}
-                                onChange={handleChange}
-                                required
-                                className="w-full px-4 py-3 bg-white bg-opacity-10 backdrop-blur-sm text-white rounded-lg border border-white border-opacity-20 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-white placeholder-opacity-50"
-                            />
-                        </div>
                         <div className="mb-6">
                             <label className="block text-white text-opacity-80 font-semibold mb-2">Title:</label>
                             <input
