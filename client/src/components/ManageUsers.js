@@ -153,15 +153,14 @@ const ManageUsers = () => {
                                             )}
                                         </td>
                                         <td className="border-t border-white border-opacity-10 px-6 py-4">
-                                            {editingUserId === user._id ? (
-                                                <input
-                                                    type="text"
-                                                    value={editedUser.avatar || ''}
-                                                    onChange={(e) => setEditedUser({ ...editedUser, avatar: e.target.value })}
-                                                    className="bg-white bg-opacity-20 text-white p-2 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            {user.avatar ? (
+                                                <img 
+                                                    src={user.avatar} 
+                                                    alt="Avatar" 
+                                                    className="w-10 h-10 rounded-full object-cover"
                                                 />
                                             ) : (
-                                                user.avatar
+                                                <span>No Avatar</span>
                                             )}
                                         </td>
                                         <td className="border-t border-white border-opacity-10 px-6 py-4">

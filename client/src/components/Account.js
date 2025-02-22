@@ -56,6 +56,17 @@ const AccountPage = () => {
         <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-blue-900">
             <div className="w-full max-w-lg p-8 bg-white bg-opacity-10 backdrop-blur-lg shadow-2xl rounded-2xl">
                 <h1 className="text-2xl font-bold text-white text-opacity-90 mb-6 text-center">My Account</h1>
+                
+                {userDetails.avatar && (
+                    <div className="flex justify-center mb-6">
+                        <img 
+                            src={userDetails.avatar} 
+                            alt="User Avatar" 
+                            className="w-32 h-32 rounded-full border-4 border-white shadow-lg object-cover"
+                        />
+                    </div>
+                )}
+
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-white text-opacity-80">Username</label>
