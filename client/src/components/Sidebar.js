@@ -9,7 +9,7 @@ const Sidebar = () => {
 
     const handleLogout = () => {
         localStorage.removeItem('token');
-        navigate('/home');
+        navigate('/login');
     };
 
     useEffect(() => {
@@ -47,13 +47,25 @@ const Sidebar = () => {
                 <ul className="space-y-2 px-3">
                     <li><Link to="/create-ticket" className={linkClasses}>Create a ticket</Link></li>
                     <li><Link to="/dashboard" className={linkClasses}>Dashboard</Link></li>
-                    <li><Link to="/view-tickets" className={linkClasses}>View Tickets</Link></li>
+
+                    {/* Show "View Tickets" only for customers */}
+                    {user?.role === 'customer' && (
+                        <li><Link to="/view-tickets" className={linkClasses}>View Tickets</Link></li>
+                    )}
+
+                    {/* Show "Manage Tickets" for non-customers (admins, support engineers) */}
+                    {user?.role !== 'customer' && (
+                        <li><Link to="/manage-tickets" className={linkClasses}>Manage Tickets</Link></li>
+                    )}
+
                     <li><Link to="/view-reviews" className={linkClasses}>Reviews</Link></li>
 
+                    {/* Admin-specific link */}
                     {user?.role === 'admin' && (
                         <li><Link to="/admin-dashboard" className={`${linkClasses} text-purple-400 hover:text-purple-300`}>Admin Dashboard</Link></li>
                     )}
 
+                    {/* Support Engineer-specific link */}
                     {user?.role === 'support_engineer' && (
                         <li><Link to="/manage-tickets" className={`${linkClasses} text-blue-400 hover:text-blue-300`}>Manage Tickets</Link></li>
                     )}

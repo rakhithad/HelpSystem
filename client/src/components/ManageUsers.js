@@ -46,7 +46,7 @@ const ManageUsers = () => {
     const handleDelete = async (userId) => {
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`/api/auth/users/${userId}`, {
+            await axios.delete(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/users/${userId}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setUsers(users.filter((user) => user._id !== userId));

@@ -108,16 +108,11 @@ router.post('/login', async (req, res) => {
         // Log for debugging
         console.log('Login successful:', {
             username: user.username,
-            role: user.role,
-            uid: user.uid
         });
 
         // Send response
         res.status(200).json({
             token, // Return the token for authorization
-            uid: user.uid, // Include UID in the response
-            username: user.username, // Include username for convenience
-            role: user.role, // Include role for front-end use
             message: 'Login successful'
         });
 

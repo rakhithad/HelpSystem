@@ -54,47 +54,54 @@ router.get('/view-tickets', authenticateToken, async (req, res) => {
     try {
         const user = req.user;
 
-        if (user.role === 'admin') {
-            // Admin can see all tickets
-            const tickets = await Ticket.find();
-            return res.json(tickets);
+        if(!user) {
+            return res.status(403).json({ message: 'Access Denied' });
         }
 
         if (user.role === 'customer') {
             // Customer can only see their own tickets
             const tickets = await Ticket.find({ uid: user.uid });
+            return res.json({ tickets, role: user.role });
+        } else {
+            const tickets = await Ticket.find();
             return res.json(tickets);
         }
 
-        if (user.role === 'support_engineer') {
-            // Support Engineer can only see the tickets assigned to them
-            const tickets = await Ticket.find({ assignedSupportEngineer: user.uid }); 
-            return res.json(tickets); 
-        }
-
-        // If the user role is not recognized
-        return res.status(403).json({ message: 'Access Denied' });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ message: 'Server Error', error: error.message });
     }
 });
 
-
 router.put('/update-ticket/:id', authenticateToken, async (req, res) => {
     try {
-        const { status, priority, assignedSupportEngineer } = req.body;
-        const ticket = await Ticket.findByIdAndUpdate(
-            req.params.id,
-            { status, priority, assignedSupportEngineer },
-            { new: true }
-        );
+        const { status, priority, assignedSupportEngineer, description } = req.body;
+        const user = req.user;
 
+        // Find the ticket
+        const ticket = await Ticket.findById(req.params.id, );
         if (!ticket) {
             return res.status(404).json({ message: 'Ticket not found' });
         }
 
-        res.status(200).json(ticket);
+        // If the user is a customer, restrict updates to only the description
+        if (user.role === 'customer') {
+            if (Object.keys(req.body).some(key => key !== 'description')) {
+                return res.status(403).json({ message: 'You are only allowed to update the description.' });
+            }
+            ticket.description = description;
+        } else {
+            // For other roles, allow updates to status, priority, and assignedSupportEngineer
+            if (status) ticket.status = status;
+            if (priority) ticket.priority = priority;
+            if (assignedSupportEngineer) ticket.assignedSupportEngineer = assignedSupportEngineer;
+            if (description) ticket.description = description;
+        }
+
+        // Save the updated ticket
+        const updatedTicket = await ticket.save();
+
+        res.status(200).json(updatedTicket);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Failed to update ticket', error: error.message });
@@ -173,95 +180,129 @@ router.get('/tickets-by-status', async (req, res) => {
 });
 
 
-// GET report data for a company
 router.get('/report', authenticateToken, async (req, res) => {
     try {
         const { companyId } = req.query;
-        if (!companyId) return res.status(400).json({ error: 'Company ID is required' });
 
-        const company = await Company.findOne({ companyId });
-        if (!company) return res.status(404).json({ error: 'Company not found' });
-
-        const users = await User.find({ companyId }).select('uid firstName lastName role');
-        const userIds = users.map(user => user.uid);
-
-        const tickets = await Ticket.find({ uid: { $in: userIds } });
-
-        if (!tickets.length) {
-            return res.json({
-                companyName: company.name,
-                totalTickets: 0,
-                avgSolvingTime: 0,
-                reviewCount: 0,
-                ticketsByStatus: {},
-                ticketsByPriority: {},
-                ticketsByUser: [],
-                ticketsBySupportEngineer: [],
-                reviews: []
-            });
+        if (!companyId) {
+            return res.status(400).json({ message: 'Company ID is required' });
         }
 
-        const totalTickets = tickets.length;
-        const solvedTickets = tickets.filter(ticket => ticket.status === 'done');
+        const pipeline = [
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'uid',
+                    foreignField: 'uid',
+                    as: 'userDetails'
+                }
+            },
+            { $unwind: '$userDetails' },
+            {
+                $lookup: {
+                    from: 'companies',
+                    localField: 'userDetails.companyId',
+                    foreignField: 'companyId',
+                    as: 'companyDetails'
+                }
+            },
+            { $unwind: { path: '$companyDetails', preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'assignedSupportEngineer',
+                    foreignField: 'uid',
+                    as: 'engineerDetails'
+                }
+            },
+            { $unwind: { path: '$engineerDetails', preserveNullAndEmptyArrays: true } },
+            {
+                $match: {
+                    'userDetails.companyId': companyId
+                }
+            },
+            {
+                $project: {
+                    tid: 1,
+                    title: 1,
+                    description: 1,
+                    status: 1,
+                    priority: 1,
+                    createdAt: 1,
+                    updatedAt: 1,
+                    customer: {
+                        uid: '$userDetails.uid',
+                        name: { $concat: ['$userDetails.firstName', ' ', '$userDetails.lastName'] },
+                        phoneNumber: '$userDetails.phoneNumber',
+                        location: '$userDetails.location'
+                    },
+                    company: '$companyDetails',
+                    assignedSupportEngineer: {
+                        uid: '$engineerDetails.uid',
+                        name: { $concat: ['$engineerDetails.firstName', ' ', '$engineerDetails.lastName'] }
+                    },
+                    review: 1,
+                    rating: 1
+                }
+            }
+        ];
 
-        const avgSolvingTime = solvedTickets.length > 0
-            ? (solvedTickets.reduce((sum, ticket) => sum + ((new Date(ticket.updatedAt) - new Date(ticket.createdAt)) / 3600000), 0) / solvedTickets.length).toFixed(2)
-            : 0;
+        const reportData = await Ticket.aggregate(pipeline);
 
-        const reviewCount = tickets.filter(ticket => ticket.review !== null).length;
+        // Calculate metrics
+        const allTicketsCount = reportData.length;
 
-        const ticketsByStatus = tickets.reduce((acc, ticket) => {
-            acc[ticket.status] = acc[ticket.status] || [];
-            acc[ticket.status].push(ticket);
+        const doneTickets = reportData.filter(ticket => ticket.status === 'done');
+        const averageTime = doneTickets.reduce((acc, ticket) => {
+            const createdAt = new Date(ticket.createdAt);
+            const updatedAt = new Date(ticket.updatedAt);
+            return acc + (updatedAt - createdAt);
+        }, 0) / (doneTickets.length || 1);
+
+        const ticketsByStatus = reportData.reduce((acc, ticket) => {
+            acc[ticket.status] = (acc[ticket.status] || 0) + 1;
             return acc;
         }, {});
 
-        const ticketsByPriority = tickets.reduce((acc, ticket) => {
-            acc[ticket.priority] = acc[ticket.priority] || [];
-            acc[ticket.priority].push(ticket);
+        const ticketsByEngineer = reportData.reduce((acc, ticket) => {
+            const engineerName = ticket.assignedSupportEngineer?.name || 'Not Assigned';
+            acc[engineerName] = (acc[engineerName] || 0) + 1;
             return acc;
         }, {});
 
-        const ticketsByUser = users.map(user => ({
-            uid: user.uid,
-            name: `${user.firstName} ${user.lastName}`,
-            tickets: tickets.filter(ticket => ticket.uid === user.uid)
+        const ticketsByCustomer = reportData.reduce((acc, ticket) => {
+            const customerName = ticket.customer.name;
+            acc[customerName] = (acc[customerName] || 0) + 1;
+            return acc;
+        }, {});
+
+        const ticketsByPriority = reportData.reduce((acc, ticket) => {
+            acc[ticket.priority] = (acc[ticket.priority] || 0) + 1;
+            return acc;
+        }, {});
+
+        const reviews = reportData.filter(ticket => ticket.review).map(ticket => ({
+            review: ticket.review,
+            rating: ticket.rating,
+            customer: ticket.customer.name
         }));
 
-        const ticketsBySupportEngineer = users
-            .filter(user => user.role === 'support_engineer')
-            .map(engineer => ({
-                uid: engineer.uid,
-                name: `${engineer.firstName} ${engineer.lastName}`,
-                tickets: tickets.filter(ticket => ticket.assignedSupportEngineer === engineer.uid)
-            }));
-
-        const reviews = tickets
-            .filter(ticket => ticket.review !== null)
-            .map(ticket => ({
-                tid: ticket.tid,
-                customerName: users.find(user => user.uid === ticket.uid)?.firstName || 'Unknown',
-                review: ticket.review,
-                rating: ticket.rating
-            }));
-
-        res.json({
-            companyName: company.name,
-            totalTickets,
-            avgSolvingTime,
-            reviewCount,
+        res.status(200).json({
+            allTicketsCount,
+            averageTime,
             ticketsByStatus,
+            ticketsByEngineer,
+            ticketsByCustomer,
             ticketsByPriority,
-            ticketsByUser,
-            ticketsBySupportEngineer,
-            reviews
+            reviews,
+            reportData
         });
-
     } catch (error) {
-        console.error('Error fetching report data:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
+        console.error('Error fetching report:', error);
+        res.status(500).json({ message: 'Error generating report' });
     }
 });
+
 
 // Add review and rating to a ticket
 router.post('/review/:ticketId', authenticateToken, async (req, res) => {
@@ -281,9 +322,15 @@ router.post('/review/:ticketId', authenticateToken, async (req, res) => {
             return res.status(400).json({ message: 'Cannot review a ticket that is not completed' });
         }
 
-        // Add the review and rating
+        // Check if the ticket has already been reviewed
+        if (ticket.reviewed) {
+            return res.status(400).json({ message: 'This ticket has already been reviewed' });
+        }
+
+        // Add the review, rating, and mark the ticket as reviewed
         ticket.review = review;
         ticket.rating = rating;
+        ticket.reviewed = true; // Mark the ticket as reviewed
         await ticket.save();
 
         res.json({ message: 'Review submitted successfully', ticket });
@@ -308,10 +355,6 @@ router.get('/reviews', async (req, res) => {
         res.status(500).json({ message: 'Failed to fetch reviews' });
     }
 });
-
-
-
-
 
 
 module.exports = router;
