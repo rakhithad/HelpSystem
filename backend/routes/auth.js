@@ -11,7 +11,7 @@ const router = express.Router();
 
 // Register route
 router.post('/register', async (req, res) => {
-    const { username, password, firstName, lastName, phoneNumber, location, role, companyId } = req.body;
+    const { username, password, firstName, lastName, phoneNumber, location, role, companyId, avatar } = req.body;
 
     try {
         // Check if the username already exists
@@ -53,7 +53,8 @@ router.post('/register', async (req, res) => {
             lastName,
             phoneNumber,
             location,
-            companyId
+            companyId,
+            avatar
         });
 
         await newUser.save();
@@ -107,16 +108,11 @@ router.post('/login', async (req, res) => {
         // Log for debugging
         console.log('Login successful:', {
             username: user.username,
-            role: user.role,
-            uid: user.uid
         });
 
         // Send response
         res.status(200).json({
             token, // Return the token for authorization
-            uid: user.uid, // Include UID in the response
-            username: user.username, // Include username for convenience
-            role: user.role, // Include role for front-end use
             message: 'Login successful'
         });
 
@@ -178,11 +174,11 @@ router.put('/users/:id', authenticateToken, async (req, res) => {
         }
 
         const { id } = req.params;
-        const { firstName, lastName, role, phoneNumber, location } = req.body;
+        const { firstName, lastName, role, phoneNumber, location, avatar } = req.body;
 
         const updatedUser = await User.findByIdAndUpdate(
             id,
-            { firstName, lastName, role, phoneNumber, location },
+            { firstName, lastName, role, phoneNumber, location, avatar },
             { new: true } // Return the updated document
         );
 

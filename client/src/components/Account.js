@@ -9,6 +9,7 @@ const AccountPage = () => {
         email: '',
         phoneNumber: '',
         location: '',
+        avatar: ''
     });
     const [isEditing, setIsEditing] = useState(false);
 
@@ -55,6 +56,17 @@ const AccountPage = () => {
         <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-blue-900">
             <div className="w-full max-w-lg p-8 bg-white bg-opacity-10 backdrop-blur-lg shadow-2xl rounded-2xl">
                 <h1 className="text-2xl font-bold text-white text-opacity-90 mb-6 text-center">My Account</h1>
+                
+                {userDetails.avatar && (
+                    <div className="flex justify-center mb-6">
+                        <img 
+                            src={userDetails.avatar} 
+                            alt="User Avatar" 
+                            className="w-32 h-32 rounded-full border-4 border-white shadow-lg object-cover"
+                        />
+                    </div>
+                )}
+
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-white text-opacity-80">Username</label>
@@ -105,6 +117,17 @@ const AccountPage = () => {
                             type="text"
                             name="location"
                             value={userDetails.location}
+                            onChange={handleChange}
+                            readOnly={!isEditing}
+                            className={`w-full p-3 mt-1 border rounded-lg bg-white bg-opacity-20 text-white text-opacity-90 focus:ring focus:ring-indigo-500 ${isEditing ? 'focus:outline-none' : 'cursor-not-allowed'}`}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-white text-opacity-80">Avatar</label>
+                        <input
+                            type="text"
+                            name="avatar"
+                            value={userDetails.avatar}
                             onChange={handleChange}
                             readOnly={!isEditing}
                             className={`w-full p-3 mt-1 border rounded-lg bg-white bg-opacity-20 text-white text-opacity-90 focus:ring focus:ring-indigo-500 ${isEditing ? 'focus:outline-none' : 'cursor-not-allowed'}`}

@@ -9,6 +9,7 @@ const Register = () => {
     const [lastName, setLastName] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
     const [location, setLocation] = useState('');
+    const [avatar, setAvatar] = useState('');
     const [role, setRole] = useState('customer');
     const [companies, setCompanies] = useState([]);
     const [companyId, setCompanyId] = useState('');
@@ -45,6 +46,7 @@ const Register = () => {
                 phoneNumber,
                 location: location.toLowerCase(),
                 role: role.toLowerCase(),
+                avatar,
                 ...(role === 'customer' && { companyId }),
             });
             alert('User registered successfully');
@@ -55,6 +57,7 @@ const Register = () => {
             setLastName('');
             setPhoneNumber('');
             setLocation('');
+            setAvatar('');
             setRole('customer');
             setCompanyId('');
             
@@ -135,6 +138,16 @@ const Register = () => {
                             onChange={(e) => setLocation(e.target.value)}
                             className={inputClasses}
                         />
+
+                        <input
+                            type="text"
+                            placeholder="avatar"
+                            value={avatar}
+                            onChange={(e) => setAvatar(e.target.value)}
+                            className={inputClasses}
+                        />
+
+
 
                         <select
                             value={role}

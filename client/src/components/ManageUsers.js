@@ -46,7 +46,7 @@ const ManageUsers = () => {
     const handleDelete = async (userId) => {
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`/api/auth/users/${userId}`, {
+            await axios.delete(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/users/${userId}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setUsers(users.filter((user) => user._id !== userId));
@@ -80,6 +80,7 @@ const ManageUsers = () => {
                                     <th className="px-6 py-3">Role</th>
                                     <th className="px-6 py-3">Phone</th>
                                     <th className="px-6 py-3">Location</th>
+                                    <th className="px-6 py-3">Avatar</th>
                                     <th className="px-6 py-3">Actions</th>
                                 </tr>
                             </thead>
@@ -149,6 +150,17 @@ const ManageUsers = () => {
                                                 />
                                             ) : (
                                                 user.location
+                                            )}
+                                        </td>
+                                        <td className="border-t border-white border-opacity-10 px-6 py-4">
+                                            {user.avatar ? (
+                                                <img 
+                                                    src={user.avatar} 
+                                                    alt="Avatar" 
+                                                    className="w-10 h-10 rounded-full object-cover"
+                                                />
+                                            ) : (
+                                                <span>No Avatar</span>
                                             )}
                                         </td>
                                         <td className="border-t border-white border-opacity-10 px-6 py-4">

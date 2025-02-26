@@ -19,24 +19,27 @@ const AdminDashboard = () => {
                     </nav>
                     
                     <div className="space-y-6">
-                        <button
+                    <button
                             className="w-full px-6 py-4 bg-white bg-opacity-10 backdrop-blur-md text-white text-lg font-semibold rounded-2xl shadow-2xl hover:bg-opacity-20 transition-all duration-300"
-                            onClick={() => navigate('/manage-users')}
+                            onClick={() => navigate('/create-company')}
                         >
-                            Manage Users
+                            Add Company
                         </button>
-                        <button
-                            className="w-full px-6 py-4 bg-white bg-opacity-10 backdrop-blur-md text-white text-lg font-semibold rounded-2xl shadow-2xl hover:bg-opacity-20 transition-all duration-300"
-                            onClick={() => navigate('/manage-tickets')}
-                        >
-                            Manage Tickets
-                        </button>
+
                         <button
                             className="w-full px-6 py-4 bg-white bg-opacity-10 backdrop-blur-md text-white text-lg font-semibold rounded-2xl shadow-2xl hover:bg-opacity-20 transition-all duration-300"
                             onClick={() => navigate('/register')}
                         >
                             Add User
                         </button>
+
+                        <button
+                            className="w-full px-6 py-4 bg-white bg-opacity-10 backdrop-blur-md text-white text-lg font-semibold rounded-2xl shadow-2xl hover:bg-opacity-20 transition-all duration-300"
+                            onClick={() => navigate('/manage-users')}
+                        >
+                            Manage Users
+                        </button>
+                        
                         <button
                             className="w-full px-6 py-4 bg-white bg-opacity-10 backdrop-blur-md text-white text-lg font-semibold rounded-2xl shadow-2xl hover:bg-opacity-20 transition-all duration-300"
                             onClick={() => navigate('/report')}
