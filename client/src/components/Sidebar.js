@@ -65,10 +65,6 @@ const Sidebar = () => {
                         <li><Link to="/admin-dashboard" className={`${linkClasses} text-purple-400 hover:text-purple-300`}>Admin Dashboard</Link></li>
                     )}
 
-                    {/* Support Engineer-specific link */}
-                    {user?.role === 'support_engineer' && (
-                        <li><Link to="/manage-tickets" className={`${linkClasses} text-blue-400 hover:text-blue-300`}>Manage Tickets</Link></li>
-                    )}
                 </ul>
             </nav>
 
