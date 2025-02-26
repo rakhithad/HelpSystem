@@ -16,7 +16,7 @@ const Sidebar = () => {
         if (token) {
             const fetchUser = async () => {
                 try {
-                    const response = await axios.get('http://localhost:5000/api/auth/account', {
+                    const response = await axios.get(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/account`, {
                         headers: { Authorization: `Bearer ${token}` }
                     });
                     setUser(response.data);
