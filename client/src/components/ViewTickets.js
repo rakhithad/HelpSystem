@@ -17,12 +17,12 @@ const ViewTickets = () => {
         const fetchData = async () => {
             try {
                 const token = localStorage.getItem('token');
-    
+
                 // Fetch tickets
                 const ticketsResponse = await axios.get(`${process.env.REACT_APP_BACKEND_BASEURL}/tickets/view-tickets`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
-    
+
                 // Check if the response contains the tickets array
                 if (ticketsResponse.data && Array.isArray(ticketsResponse.data.tickets)) {
                     setTickets(ticketsResponse.data.tickets); // Set tickets
@@ -36,9 +36,25 @@ const ViewTickets = () => {
                 console.error(err);
             }
         };
-    
+
         fetchData();
-    }, []); 
+    }, []);
+
+    useEffect(() => {
+        const fetchSupportEngineers = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await axios.get(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/support-engineers`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                setSupportEngineers(response.data); // Set the list of support engineers
+            } catch (err) {
+                console.error('Failed to fetch support engineers:', err);
+            }
+        };
+
+        fetchSupportEngineers();
+    }, []);
 
     useEffect(() => {
         let filtered = [...tickets];
@@ -92,13 +108,13 @@ const ViewTickets = () => {
             const token = localStorage.getItem('token');
             const updates = { description: editingValues.description }; // Only send description for customers
             console.log('Sending payload:', updates); // Debugging
-    
+
             const response = await axios.put(
                 `${process.env.REACT_APP_BACKEND_BASEURL}/tickets/update-ticket/${ticketId}`,
                 updates,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
-    
+
             setTickets((prevTickets) =>
                 prevTickets.map((ticket) =>
                     ticket._id === ticketId ? response.data : ticket
@@ -257,26 +273,9 @@ const ViewTickets = () => {
                                                 )}
                                             </td>
                                             <td className="border-t border-white border-opacity-10 px-6 py-4">
-                                                {editingTicketId === ticket._id && userRole !== 'customer' ? (
-                                                    <select
-                                                        value={editingValues.assignedSupportEngineer || ''}
-                                                        onChange={(e) =>
-                                                            setEditingValues({ ...editingValues, assignedSupportEngineer: e.target.value })
-                                                        }
-                                                        className="px-4 py-2 bg-white bg-opacity-10 backdrop-blur-md text-white rounded-lg border border-white border-opacity-20 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                                    >
-                                                        <option value="">Not Assigned</option>
-                                                        {supportEngineers.map((engineer) => (
-                                                            <option key={engineer.uid} value={engineer.uid}>
-                                                                {engineer.firstName}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                ) : (
-                                                    ticket.assignedSupportEngineer
-                                                        ? supportEngineers.find((e) => e.uid === ticket.assignedSupportEngineer)?.firstName
-                                                        : 'Not Assigned'
-                                                )}
+                                                {ticket.assignedSupportEngineer
+                                                    ? (supportEngineers.find((e) => e.uid === ticket.assignedSupportEngineer)?.firstName || 'Not Assigned')
+                                                    : 'Not Assigned'}
                                             </td>
                                             <td className="border-t border-white border-opacity-10 px-6 py-4">
                                                 {editingTicketId === ticket._id ? (
@@ -295,13 +294,13 @@ const ViewTickets = () => {
                                                     </button>
                                                 )}
                                                 {ticket.status === 'done' && userRole === 'customer' && !ticket.reviewed && (
-    <button
-        onClick={() => handleReview(ticket._id)}
-        className="ml-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-all duration-300"
-    >
-        Review
-    </button>
-)}
+                                                    <button
+                                                        onClick={() => handleReview(ticket._id)}
+                                                        className="ml-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-all duration-300"
+                                                    >
+                                                        Review
+                                                    </button>
+                                                )}
                                             </td>
                                         </tr>
                                     ))

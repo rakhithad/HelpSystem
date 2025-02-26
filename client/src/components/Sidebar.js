@@ -27,7 +27,7 @@ const Sidebar = () => {
             };
             fetchUser();
         }
-    }, [token]);
+    }, []);
 
     const goToAccountPage = () => {
         navigate('/account');
