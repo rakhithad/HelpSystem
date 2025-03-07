@@ -133,6 +133,23 @@ router.get('/support-engineers', authenticateToken, async (req, res) => {
     }
 });
 
+router.get('/customers', authenticateToken, async (req, res) => {
+    try {
+        const customers = await User.find({ role: 'customer' }).select('uid firstName lastName');
+        res.json(customers);
+    } catch (error) {
+        console.error('Error fetching customers:', error);
+        res.status(500).json({ message: 'Failed to fetch customers' });
+    }
+});
+
+router.get('/user-role', authenticateToken, async (req, res) => {
+    try {
+        res.json({ role: req.user.role });
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching role', error: error.message });
+    }
+});
 
 // Fetch all users (Admin only)
 router.get('/users', authenticateToken, async (req, res) => {
