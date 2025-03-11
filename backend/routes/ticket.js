@@ -211,12 +211,6 @@ router.get('/tickets-by-status', async (req, res) => {
 
 router.get('/report', authenticateToken, async (req, res) => {
     try {
-        const { companyId } = req.query;
-
-        if (!companyId) {
-            return res.status(400).json({ message: 'Company ID is required' });
-        }
-
         const pipeline = [
             {
                 $lookup: {
@@ -245,11 +239,6 @@ router.get('/report', authenticateToken, async (req, res) => {
                 }
             },
             { $unwind: { path: '$engineerDetails', preserveNullAndEmptyArrays: true } },
-            {
-                $match: {
-                    'userDetails.companyId': companyId
-                }
-            },
             {
                 $project: {
                     tid: 1,
@@ -331,7 +320,6 @@ router.get('/report', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Error generating report' });
     }
 });
-
 
 // Add review and rating to a ticket
 router.post('/review/:ticketId', authenticateToken, async (req, res) => {
