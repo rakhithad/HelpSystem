@@ -7,22 +7,46 @@ const Counter = require('../models/counter');
 
 const router = express.Router();
 
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
     try {
-        const {  title, description, priority, uid } = req.body;
+        const { title, description, priority, customerUid, assignedSupportEngineer } = req.body;
+        const userRole = req.user.role;
+        const userUid = req.user.uid;
 
         // Validate required fields
-        if ( !title || !description || !priority|| !uid) {
+        if (!title || !description || !priority) {
             return res.status(400).json({ message: 'Missing required fields' });
         }
 
-        
+        let finalCustomerUid;
+        let finalAssignedEngineer = null; // Default to null unless assigned
+
+        if (userRole === 'admin') {
+            // Admin must provide a customer and support engineer
+            if (!customerUid || !assignedSupportEngineer) {
+                return res.status(400).json({ message: 'Admin must assign a customer and a support engineer' });
+            }
+            finalCustomerUid = customerUid;
+            finalAssignedEngineer = assignedSupportEngineer;
+        } else if (userRole === 'support_engineer') {
+            // Support engineers must select a customer, and they assign themselves
+            if (!customerUid) {
+                return res.status(400).json({ message: 'Support engineer must assign a customer' });
+            }
+            finalCustomerUid = customerUid;
+            finalAssignedEngineer = userUid;
+        } else if (userRole === 'customer') {
+            // Customers create their own ticket, no assigned support engineer
+            finalCustomerUid = userUid;
+        } else {
+            return res.status(403).json({ message: 'Unauthorized: Only admins, support engineers, and customers can create tickets' });
+        }
 
         // Increment the ticket counter
         const counter = await Counter.findOneAndUpdate(
-            { name: 'ticket_tid' }, // Use a specific name to differentiate from the user counter
+            { name: 'ticket_tid' },
             { $inc: { count: 1 } },
-            { new: true, upsert: true } // Create the document if it doesn't exist
+            { new: true, upsert: true }
         );
 
         if (!counter) {
@@ -37,7 +61,9 @@ router.post('/', async (req, res) => {
             title,
             description,
             priority,
-            uid,
+            uid: finalCustomerUid, // Assign customer UID
+            assignedSupportEngineer: finalAssignedEngineer, // Assign based on role
+            status: "not started",
         });
 
         await newTicket.save();
@@ -47,6 +73,9 @@ router.post('/', async (req, res) => {
         res.status(500).json({ message: 'Failed to create ticket', error: error.message });
     }
 });
+
+
+
 
 
 // View all tickets (Only accessible by Admin, Customers, and Support Engineers)
@@ -182,12 +211,6 @@ router.get('/tickets-by-status', async (req, res) => {
 
 router.get('/report', authenticateToken, async (req, res) => {
     try {
-        const { companyId } = req.query;
-
-        if (!companyId) {
-            return res.status(400).json({ message: 'Company ID is required' });
-        }
-
         const pipeline = [
             {
                 $lookup: {
@@ -216,11 +239,6 @@ router.get('/report', authenticateToken, async (req, res) => {
                 }
             },
             { $unwind: { path: '$engineerDetails', preserveNullAndEmptyArrays: true } },
-            {
-                $match: {
-                    'userDetails.companyId': companyId
-                }
-            },
             {
                 $project: {
                     tid: 1,
@@ -302,7 +320,6 @@ router.get('/report', authenticateToken, async (req, res) => {
         res.status(500).json({ message: 'Error generating report' });
     }
 });
-
 
 // Add review and rating to a ticket
 router.post('/review/:ticketId', authenticateToken, async (req, res) => {
