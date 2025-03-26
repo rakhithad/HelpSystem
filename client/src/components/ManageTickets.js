@@ -1,17 +1,61 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { FaSpinner, FaBars, FaHome, FaUser } from 'react-icons/fa';
+import Sidebar from './Sidebar';
 
 const ManageTickets = () => {
     const [tickets, setTickets] = useState([]);
     const [filteredTickets, setFilteredTickets] = useState([]);
     const [supportEngineers, setSupportEngineers] = useState([]);
-    const [companies, setCompanies] = useState([]);
-    const [filters, setFilters] = useState({ status: '', company: '', date: 'all' });
+    const [filters, setFilters] = useState({ status: '', date: 'all' });
     const [error, setError] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const navigate = useNavigate();
 
+    // Toggle sidebar and disable body scroll when open
+    const toggleSidebar = () => {
+        setIsSidebarOpen(!isSidebarOpen);
+    };
+
+    // Close sidebar when clicking outside on mobile
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            const sidebar = document.querySelector('.sidebar-container');
+            const toggleButton = document.querySelector('.sidebar-toggle');
+            
+            if (window.innerWidth < 1024 && isSidebarOpen && 
+                sidebar && !sidebar.contains(event.target) && 
+                toggleButton && !toggleButton.contains(event.target)) {
+                setIsSidebarOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isSidebarOpen]);
+
+    // Disable body scroll when sidebar is open on mobile
+    useEffect(() => {
+        if (window.innerWidth < 1024) {
+            if (isSidebarOpen) {
+                document.body.style.overflow = 'hidden';
+            } else {
+                document.body.style.overflow = 'auto';
+            }
+        }
+        return () => {
+            document.body.style.overflow = 'auto';
+        };
+    }, [isSidebarOpen]);
+
+    // Fetch tickets and support engineers
     useEffect(() => {
         const fetchData = async () => {
+            setIsLoading(true);
+            setError(null);
+
             try {
                 const token = localStorage.getItem('token');
 
@@ -21,31 +65,27 @@ const ManageTickets = () => {
                 setTickets(ticketsResponse.data);
                 setFilteredTickets(ticketsResponse.data);
 
-                const companyNames = [...new Set(ticketsResponse.data.map((ticket) => ticket.company))];
-                setCompanies(companyNames);
-
                 const engineersResponse = await axios.get(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/support-engineers`, {
                     headers: { Authorization: `Bearer ${token}` },
                 });
                 setSupportEngineers(engineersResponse.data);
             } catch (err) {
-                setError('Failed to fetch data.');
+                setError('Failed to fetch data. Please try again.');
                 console.error(err);
+            } finally {
+                setIsLoading(false);
             }
         };
 
         fetchData();
     }, []);
 
+    // Apply filters
     useEffect(() => {
         let filtered = [...tickets];
 
         if (filters.status) {
             filtered = filtered.filter((ticket) => ticket.status === filters.status);
-        }
-
-        if (filters.company) {
-            filtered = filtered.filter((ticket) => ticket.company === filters.company);
         }
 
         if (filters.date !== 'all') {
@@ -72,11 +112,11 @@ const ManageTickets = () => {
         setFilteredTickets(filtered);
     }, [filters, tickets]);
 
-    const handleFilterChange = (filterName, value) => {
-        setFilters({ ...filters, [filterName]: value });
-    };
+    const handleFilterChange = useCallback((filterName, value) => {
+        setFilters((prevFilters) => ({ ...prevFilters, [filterName]: value }));
+    }, []);
 
-    const handleUpdateTicket = async (ticketId, updates) => {
+    const handleUpdateTicket = useCallback(async (ticketId, updates) => {
         try {
             const token = localStorage.getItem('token');
             const response = await axios.put(
@@ -91,12 +131,12 @@ const ManageTickets = () => {
                 )
             );
         } catch (err) {
-            alert('Failed to update ticket.');
+            alert('Failed to update ticket. Please try again.');
             console.error(err);
         }
-    };
+    }, []);
 
-    const handleDeleteTicket = async (ticketId) => {
+    const handleDeleteTicket = useCallback(async (ticketId) => {
         try {
             const token = localStorage.getItem('token');
             await axios.delete(`${process.env.REACT_APP_BACKEND_BASEURL}/tickets/delete-ticket/${ticketId}`, {
@@ -105,27 +145,40 @@ const ManageTickets = () => {
 
             setTickets((prevTickets) => prevTickets.filter((ticket) => ticket._id !== ticketId));
         } catch (err) {
-            alert('Failed to delete ticket.');
+            alert('Failed to delete ticket. Please try again.');
             console.error(err);
         }
-    };
+    }, []);
 
-    if (error) return <div>{error}</div>;
+    if (error) return <div className="text-red-400 p-8">{error}</div>;
 
     return (
-        <div className="flex min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-blue-900 overflow-hidden">
-            {/* Sidebar is assumed to be rendered here */}
-            <div className="ml-64 w-full p-8">
-                <div className="space-y-8">
+        <div className="flex h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-blue-900 overflow-hidden">
+            
+
+            {/* Sidebar - Now appears above content on mobile */}
+            <Sidebar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
+
+            {/* Semi-transparent overlay for mobile */}
+            {isSidebarOpen && (
+                <div 
+                    className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
+
+            {/* Main Content */}
+            <div className={`flex-1 pb-20 overflow-y-auto transition-all duration-300 lg:ml-64`}>
+                <div className="p-4 lg:p-8 space-y-8">
                     <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-300">
                         Manage Tickets
                     </h1>
 
                     <nav className="text-white text-opacity-80 mb-4">
-                                            <Link to="/dashboard" className="hover:underline">Dashboard</Link> {' / '}
-                                            <Link to="/admin-dashboard" className="hover:underline">Admin Dashboard</Link> {' / '}
-                                            <span className="text-purple-300">Manage Tickets</span>
-                                        </nav>
+                        <Link to="/dashboard" className="hover:underline">Dashboard</Link> {' / '}
+                        <Link to="/admin-dashboard" className="hover:underline">Admin Dashboard</Link> {' / '}
+                        <span className="text-purple-300">Manage Tickets</span>
+                    </nav>
 
                     {/* Filters */}
                     <div className="filters p-6 bg-white bg-opacity-10 backdrop-blur-md rounded-2xl shadow-2xl">
@@ -144,21 +197,7 @@ const ManageTickets = () => {
                                     <option value="done">Done</option>
                                 </select>
                             </div>
-                            <div>
-                                <label className="block text-white text-opacity-80 font-semibold mb-2">Company:</label>
-                                <select
-                                    value={filters.company}
-                                    onChange={(e) => handleFilterChange('company', e.target.value)}
-                                    className="px-4 py-2 bg-white bg-opacity-10 backdrop-blur-md text-white rounded-lg border border-white border-opacity-20 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                >
-                                    <option value="">All</option>
-                                    {companies.map((company, index) => (
-                                        <option key={index} value={company}>
-                                            {company}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+                            
                             <div>
                                 <label className="block text-white text-opacity-80 font-semibold mb-2">Date:</label>
                                 <select
@@ -174,6 +213,13 @@ const ManageTickets = () => {
                             </div>
                         </div>
                     </div>
+
+                    {/* Loading Spinner */}
+                    {isLoading && (
+                        <div className="flex justify-center items-center">
+                            <FaSpinner className="animate-spin h-8 w-8 text-purple-400" />
+                        </div>
+                    )}
 
                     {/* Tickets List */}
                     <div className="p-6 bg-white bg-opacity-10 backdrop-blur-md rounded-2xl shadow-2xl">
@@ -254,8 +300,37 @@ const ManageTickets = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Mobile Navigation Bar */}
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-gray-800 bg-opacity-90 backdrop-blur-md border-t border-purple-500 border-opacity-20 z-50">
+                <div className="flex justify-around items-center p-3">
+                    {/* Sidebar Toggle Button */}
+                    <button 
+                        onClick={toggleSidebar}
+                        className="p-3 text-purple-400 hover:text-white transition-colors"
+                    >
+                        <FaBars className="w-5 h-5" />
+                    </button>
+                    
+                    {/* Home Button */}
+                    <button 
+                        onClick={() => navigate('/dashboard')}
+                        className="p-3 text-purple-400 hover:text-white transition-colors"
+                    >
+                        <FaHome className="w-5 h-5" />
+                    </button>
+                    
+                    {/* Account Button */}
+                    <button 
+                        onClick={() => navigate('/account')}
+                        className="p-3 text-purple-400 hover:text-white transition-colors"
+                    >
+                        <FaUser className="w-5 h-5" />
+                    </button>
+                </div>
+            </div>
         </div>
     );
 };
 
-export default ManageTickets;
+export default React.memo(ManageTickets);
