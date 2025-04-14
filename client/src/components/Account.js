@@ -6,7 +6,7 @@ import Sidebar from './Sidebar';
 
 const AccountPage = () => {
     const [userDetails, setUserDetails] = useState({
-        username: '',
+        email: '',
         firstName: '',
         lastName: '',
         designation: '',
@@ -133,7 +133,7 @@ const AccountPage = () => {
                                         className="w-64 h-64 rounded-full border-4 border-white border-opacity-30 shadow-xl object-cover mb-4"
                                     />
                                 )}
-                                <h1 className="p-2 text-2xl font-bold text-white mb-1">{userDetails.username}</h1>
+                                <h1 className="p-2 text-2xl font-bold text-white mb-1">{userDetails.email}</h1>
                                 
                                 <button
                                     onClick={() => setIsEditing(true)}
@@ -167,9 +167,9 @@ const AccountPage = () => {
                                     {/* Left Column */}
                                     <div className="space-y-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-white text-opacity-80 mb-1">Username</label>
+                                            <label className="block text-sm font-medium text-white text-opacity-80 mb-1">email</label>
                                             <div className="p-3 bg-white bg-opacity-10 rounded-lg text-white text-opacity-90 border border-white border-opacity-20">
-                                                {userDetails.username}
+                                                {userDetails.email}
                                             </div>
                                         </div>
 

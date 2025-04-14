@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { FaEye, FaEyeSlash } from 'react-icons/fa'; // Eye icons from React Icons
 
 const Login = () => {
-    const [username, setUsername] = useState('');
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -12,11 +12,11 @@ const Login = () => {
     const [rememberMe, setRememberMe] = useState(false); // For Remember Me
     const navigate = useNavigate();
 
-    // Retrieve saved username from localStorage on component mount
+    // Retrieve saved email from localStorage on component mount
     useEffect(() => {
-        const savedUsername = localStorage.getItem('rememberedUsername');
-        if (savedUsername) {
-            setUsername(savedUsername);
+        const savedEmail = localStorage.getItem('rememberedEmail');
+        if (savedEmail) {
+            setEmail(savedEmail);
             setRememberMe(true); // Check the Remember Me checkbox
         }
     }, []);
@@ -27,21 +27,21 @@ const Login = () => {
         setError('');
 
         try {
-            const lowerCaseUsername = username.toLowerCase();
+            const lowerCaseEmail = email.toLowerCase();
             const lowerCasePassword = password.toLowerCase();
 
             const response = await axios.post(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/login`, {
-                username: lowerCaseUsername,
+                email: lowerCaseEmail,
                 password: lowerCasePassword,
             });
 
             localStorage.setItem('token', response.data.token);
 
-            // Save username to localStorage if Remember Me is checked
+            // Save email to localStorage if Remember Me is checked
             if (rememberMe) {
-                localStorage.setItem('rememberedUsername', lowerCaseUsername);
+                localStorage.setItem('rememberedEmail', lowerCaseEmail);
             } else {
-                localStorage.removeItem('rememberedUsername');
+                localStorage.removeItem('rememberedEmail');
             }
 
             navigate('/dashboard');
@@ -65,13 +65,13 @@ const Login = () => {
                 )}
                 <form className="space-y-6" onSubmit={handleSubmit}>
                     <div>
-                        <label className="block mb-2 text-sm font-medium text-white text-opacity-80">Username</label>
+                        <label className="block mb-2 text-sm font-medium text-white text-opacity-80">Email</label>
                         <input
                             type="text"
-                            placeholder="Enter your username"
+                            placeholder="Enter your Email"
                             className="w-full px-4 py-3 text-sm bg-white bg-opacity-10 backdrop-blur-sm text-white rounded-lg border border-white border-opacity-20 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-white placeholder-opacity-50"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
                             required
                         />
                     </div>

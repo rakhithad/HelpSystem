@@ -5,7 +5,7 @@ import { FaBars, FaHome, FaUser } from 'react-icons/fa';
 import Sidebar from './Sidebar';
 
 const Register = () => {
-    const [username, setUsername] = useState('');
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
@@ -43,7 +43,7 @@ const Register = () => {
         e.preventDefault();
         try {
             await axios.post(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/register`, {
-                username: username.toLowerCase(),
+                email: email.toLowerCase(),
                 password,
                 firstName: firstName.toLowerCase(),
                 lastName: lastName.toLowerCase(),
@@ -56,7 +56,7 @@ const Register = () => {
             });
             alert('User registered successfully');
 
-            setUsername('');
+            setEmail('');
             setPassword('');
             setFirstName('');
             setLastName('');
@@ -112,12 +112,12 @@ const Register = () => {
                                 {/* Left Column */}
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-white text-opacity-80 font-medium mb-1">Username</label>
+                                        <label className="block text-white text-opacity-80 font-medium mb-1">Email</label>
                                         <input
                                             type="text"
-                                            placeholder="Enter username"
-                                            value={username}
-                                            onChange={(e) => setUsername(e.target.value)}
+                                            placeholder="Enter Email"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
                                             required
                                             className={inputClasses}
                                         />

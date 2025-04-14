@@ -92,7 +92,7 @@ const Sidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
                             alt="Avatar" 
                             className="w-10 h-10 rounded-full mr-3 border border-purple-500"
                         />
-                        <span>{user.username}</span>
+                        <span>{user.email}</span>
                     </button>
                 )}
 

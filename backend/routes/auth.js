@@ -11,12 +11,12 @@ const router = express.Router();
 
 // Register route
 router.post('/register', async (req, res) => {
-    const { username, password, firstName, lastName, designation, phoneNumber, location, role, companyId, avatar } = req.body;
+    const { email, password, firstName, lastName, designation, phoneNumber, location, role, companyId, avatar } = req.body;
 
     try {
-        // Check if the username already exists
-        const existingUser = await User.findOne({ username });
-        if (existingUser) return res.status(400).json({ message: 'Username already taken' });
+        // Check if the email already exists
+        const existingUser = await User.findOne({ email });
+        if (existingUser) return res.status(400).json({ message: 'email already taken' });
 
         // Validate companyId for customers
         if (role === 'customer') {
@@ -46,7 +46,7 @@ router.post('/register', async (req, res) => {
         // Create and save the new user
         const newUser = new User({
             uid,
-            username,
+            email,
             password: hashedPassword,
             role: role || 'customer',
             firstName,
@@ -62,7 +62,7 @@ router.post('/register', async (req, res) => {
 
         // Generate JWT token
         const token = jwt.sign(
-            { id: newUser._id, username: newUser.username, uid: newUser.uid, role: newUser.role },
+            { id: newUser._id, email: newUser.email, uid: newUser.uid, role: newUser.role },
             process.env.JWT_SECRET,
             { expiresIn: '1h' } // Token valid for 1 hour
         );
@@ -77,11 +77,11 @@ router.post('/register', async (req, res) => {
 
 // Login Route
 router.post('/login', async (req, res) => {
-    const { username, password } = req.body;
+    const { email, password } = req.body;
 
     try {
         // Check if the user exists
-        const user = await User.findOne({ username });
+        const user = await User.findOne({ email });
         if (!user) {
             console.log('User not found');
             return res.status(400).json({ message: 'User not found' });
@@ -98,7 +98,7 @@ router.post('/login', async (req, res) => {
         const token = jwt.sign(
             {
                 id: user._id,
-                username: user.username,
+                email: user.email,
                 uid: user.uid,
                 role: user.role
             },
@@ -108,7 +108,7 @@ router.post('/login', async (req, res) => {
 
         // Log for debugging
         console.log('Login successful:', {
-            username: user.username,
+            email: user.email,
         });
 
         // Send response

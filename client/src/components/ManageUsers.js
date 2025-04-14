@@ -118,7 +118,7 @@ const ManageUsers = () => {
                             <thead>
                                 <tr className="bg-white bg-opacity-20">
                                     <th className="px-6 py-3">UID</th>
-                                    <th className="px-6 py-3">Username</th>
+                                    <th className="px-6 py-3">Email</th>
                                     <th className="px-6 py-3">First Name</th>
                                     <th className="px-6 py-3">Last Name</th>
                                     <th className="px-6 py-3">Role</th>
@@ -132,7 +132,7 @@ const ManageUsers = () => {
                                 {users.map((user) => (
                                     <tr key={user._id} className="hover:bg-white hover:bg-opacity-10 transition-all duration-300">
                                         <td className="border-t border-white border-opacity-10 px-6 py-4">{user.uid}</td>
-                                        <td className="border-t border-white border-opacity-10 px-6 py-4">{user.username}</td>
+                                        <td className="border-t border-white border-opacity-10 px-6 py-4">{user.email}</td>
                                         <td className="border-t border-white border-opacity-10 px-6 py-4">
                                             {editingUserId === user._id ? (
                                                 <input
