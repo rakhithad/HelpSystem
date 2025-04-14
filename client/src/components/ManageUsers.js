@@ -159,6 +159,18 @@ const ManageUsers = () => {
                                         </td>
                                         <td className="border-t border-white border-opacity-10 px-6 py-4">
                                             {editingUserId === user._id ? (
+                                                <input
+                                                    type="text"
+                                                    value={editedUser.designation || ''}
+                                                    onChange={(e) => setEditedUser({ ...editedUser, designation: e.target.value })}
+                                                    className="bg-white bg-opacity-20 text-white p-2 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                                />
+                                            ) : (
+                                                user.designation
+                                            )}
+                                        </td>
+                                        <td className="border-t border-white border-opacity-10 px-6 py-4">
+                                            {editingUserId === user._id ? (
                                                 <select
                                                     value={editedUser.role || ''}
                                                     onChange={(e) => setEditedUser({ ...editedUser, role: e.target.value })}

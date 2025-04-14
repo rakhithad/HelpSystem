@@ -9,6 +9,7 @@ const AccountPage = () => {
         username: '',
         firstName: '',
         lastName: '',
+        designation: '',
         email: '',
         phoneNumber: '',
         location: '',
@@ -189,6 +190,16 @@ const AccountPage = () => {
                                                     type="text"
                                                     name="lastName"
                                                     value={userDetails.lastName}
+                                                    onChange={handleChange}
+                                                    className="w-full p-3 rounded-lg bg-white bg-opacity-20 border border-purple-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-white text-opacity-80 mb-1">Last Name</label>
+                                                <input
+                                                    type="text"
+                                                    name="designation"
+                                                    value={userDetails.designation}
                                                     onChange={handleChange}
                                                     className="w-full p-3 rounded-lg bg-white bg-opacity-20 border border-purple-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                                                 />

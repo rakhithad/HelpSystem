@@ -11,7 +11,7 @@ const router = express.Router();
 
 // Register route
 router.post('/register', async (req, res) => {
-    const { username, password, firstName, lastName, phoneNumber, location, role, companyId, avatar } = req.body;
+    const { username, password, firstName, lastName, designation, phoneNumber, location, role, companyId, avatar } = req.body;
 
     try {
         // Check if the username already exists
@@ -51,6 +51,7 @@ router.post('/register', async (req, res) => {
             role: role || 'customer',
             firstName,
             lastName,
+            designation,
             phoneNumber,
             location,
             companyId,
@@ -191,11 +192,11 @@ router.put('/users/:id', authenticateToken, async (req, res) => {
         }
 
         const { id } = req.params;
-        const { firstName, lastName, role, phoneNumber, location, avatar } = req.body;
+        const { firstName, lastName, designation, role, phoneNumber, location, avatar } = req.body;
 
         const updatedUser = await User.findByIdAndUpdate(
             id,
-            { firstName, lastName, role, phoneNumber, location, avatar },
+            { firstName, lastName, designation, role, phoneNumber, location, avatar },
             { new: true } // Return the updated document
         );
 

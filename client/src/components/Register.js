@@ -9,6 +9,7 @@ const Register = () => {
     const [password, setPassword] = useState('');
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
+    const [designation, setDesignation] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
     const [location, setLocation] = useState('');
     const [avatar, setAvatar] = useState('');
@@ -46,6 +47,7 @@ const Register = () => {
                 password,
                 firstName: firstName.toLowerCase(),
                 lastName: lastName.toLowerCase(),
+                designation: designation.toLowerCase(),
                 phoneNumber,
                 location: location.toLowerCase(),
                 role: role.toLowerCase(),
@@ -58,6 +60,7 @@ const Register = () => {
             setPassword('');
             setFirstName('');
             setLastName('');
+            setDesignation('');
             setPhoneNumber('');
             setLocation('');
             setAvatar('');
@@ -150,6 +153,17 @@ const Register = () => {
                                             placeholder="Enter last name"
                                             value={lastName}
                                             onChange={(e) => setLastName(e.target.value)}
+                                            className={inputClasses}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-white text-opacity-80 font-medium mb-1">Designation</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Enter Designation"
+                                            value={designation}
+                                            onChange={(e) => setDesignation(e.target.value)}
                                             className={inputClasses}
                                         />
                                     </div>
