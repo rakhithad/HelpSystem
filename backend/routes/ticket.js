@@ -4,6 +4,7 @@ const User = require('../models/User');
 const Company = require('../models/Company');
 const authenticateToken = require('../middleware/authenticateToken');
 const Counter = require('../models/counter');
+const Notification = require('../models/notification');
 
 const router = express.Router();
 
@@ -138,19 +139,78 @@ router.put('/update-ticket/:id', authenticateToken, async (req, res) => {
 });
 
 router.delete('/delete-ticket/:id', authenticateToken, async (req, res) => {
+    const { uid, reason } = req.body; // UID of the person deleting & reason for deletion
+  
     try {
-        const ticket = await Ticket.findByIdAndDelete(req.params.id);
-
-        if (!ticket) {
-            return res.status(404).json({ message: 'Ticket not found' });
+      const ticket = await Ticket.findById(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ message: 'Ticket not found' });
+      }
+  
+      // Mark the ticket as deleted instead of removing
+      ticket.status = 'deleted';
+      ticket.deletedBy = uid;
+      ticket.deletedAt = new Date();
+      ticket.reason = reason;
+      await ticket.save();
+  
+      // Prepare notification(s)
+      const notifications = [];
+      const customerUid = ticket.uid;
+      const engineerUid = ticket.assignedSupportEngineer;
+      const ticketId = ticket.tid;
+  
+      const message = `Ticket ${ticketId} has been deleted by ${uid}`;
+  
+      if (req.user.role === 'admin') {
+        if (customerUid) {
+          notifications.push({
+            receiverUid: customerUid,
+            senderUid: uid,
+            ticketId,
+            message,
+            reason
+          });
         }
-
-        res.status(200).json({ message: 'Ticket deleted successfully', ticket });
+        if (engineerUid) {
+          notifications.push({
+            receiverUid: engineerUid,
+            senderUid: uid,
+            ticketId,
+            message,
+            reason
+          });
+        }
+      } else if (uid === customerUid && engineerUid) {
+        notifications.push({
+          receiverUid: engineerUid,
+          senderUid: uid,
+          ticketId,
+          message,
+          reason
+        });
+      } else if (uid === engineerUid && customerUid) {
+        notifications.push({
+          receiverUid: customerUid,
+          senderUid: uid,
+          ticketId,
+          message,
+          reason
+        });
+      }
+  
+      // Save notifications
+      await Notification.insertMany(notifications);
+  
+      res.status(200).json({ message: 'Ticket marked as deleted and notifications sent.', ticket });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to delete ticket', error: error.message });
+      console.error(error);
+      res.status(500).json({ message: 'Failed to delete ticket', error: error.message });
     }
-});
+  });
+  
+
+  
 
 
 router.get('/ticket-counts', async (req, res) => {

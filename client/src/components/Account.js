@@ -10,7 +10,6 @@ const AccountPage = () => {
         firstName: '',
         lastName: '',
         designation: '',
-        email: '',
         phoneNumber: '',
         location: '',
         avatar: ''

@@ -15,6 +15,7 @@ import ReviewTicketPage from './components/ReviewTicketPage';
 import ManageTickets from './components/ManageTickets';
 import HomePage from './components/HomePage';
 import ViewReviewsPage from './components/ViewReviewsPage';
+import NotificationPage from './components/NotificationPage';
 
 const App = () => {
     const isAuthenticated = () => {
@@ -60,6 +61,7 @@ const App = () => {
                         <Route path="/review-ticket/:ticketId" element={<ReviewTicketPage />} />   
                         <Route path="/manage-tickets" element={<ManageTickets />} />
                         <Route path="/view-reviews" element={<ViewReviewsPage />} />
+                        <Route path="/notifications" element={<NotificationPage />} />
 
                     </Routes>
                 </div>

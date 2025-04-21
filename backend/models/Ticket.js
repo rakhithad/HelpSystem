@@ -11,6 +11,9 @@ const ticketSchema = new mongoose.Schema({
     assignedSupportEngineer: { type: String, default: 'Not Assigned' },
     review: { type: String, default: null }, // Customer's review text
     rating: { type: Number, min: 1, max: 5, default: null }, // Rating (1-5)
+    deletedBy: { type: String },
+    deletedAt: { type: Date },
+    reason: { type: String },
 }, { timestamps: true });
 
 

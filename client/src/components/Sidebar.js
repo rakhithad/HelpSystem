@@ -69,6 +69,7 @@ const Sidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
 
             <nav className="mt-6">
                 <ul className="space-y-2 px-3">
+                <li><Link to="/notifications" className={linkClasses} onClick={() => window.innerWidth < 1024 && setIsSidebarOpen(false)}>Notifications</Link></li>
                     <li><Link to="/create-ticket" className={linkClasses} onClick={() => window.innerWidth < 1024 && setIsSidebarOpen(false)}>Create a ticket</Link></li>
                     <li><Link to="/dashboard" className={linkClasses} onClick={() => window.innerWidth < 1024 && setIsSidebarOpen(false)}>Dashboard</Link></li>
                     {user?.role === 'customer' && <li><Link to="/view-tickets" className={linkClasses} onClick={() => window.innerWidth < 1024 && setIsSidebarOpen(false)}>View Tickets</Link></li>}

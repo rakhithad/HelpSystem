@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { Link } from 'react-router-dom';
-import TicketList from './TicketList';
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
 import { FaFilter, FaFileExport, FaChartBar, FaSync } from 'react-icons/fa';
@@ -26,8 +25,7 @@ const ReportPage = () => {
         engineer: "",
         customer: "",
         priority: "",
-        rating: "",
-        dateRange: "all" // New filter for date range
+        rating: ""
     });
     const [mainFilter, setMainFilter] = useState("all");
     const [selectedCompany, setSelectedCompany] = useState("");
@@ -88,19 +86,6 @@ const ReportPage = () => {
         applyFilters(selectedFilters, "engineer", selectedCompany, engineerName);
     };
 
-    // Date range handling
-    const handleDateRangeChange = (range) => {
-        const newFilters = { ...selectedFilters, dateRange: range };
-        setSelectedFilters(newFilters);
-        
-        if (range === "custom") {
-            // Custom range selected, but wait for actual dates to be selected
-        } else {
-            // Predefined range selected
-            applyFilters(newFilters, mainFilter, selectedCompany, selectedEngineer);
-        }
-    };
-    
     const handleCustomDateChange = (type, value) => {
         const newDateRange = { ...dateRange, [type]: value };
         setDateRange(newDateRange);
@@ -114,20 +99,28 @@ const ReportPage = () => {
     // Apply all filters (main filter + additional filters)
     const applyFilters = (filters, mainFilterType, companyId, engineerName, customDateRange = null) => {
         let filtered = metrics.reportData;
-
+    
         // Apply main filter
         if (mainFilterType === "company" && companyId) {
             filtered = filtered.filter(ticket => ticket.company?.companyId === companyId);
         } else if (mainFilterType === "engineer" && engineerName) {
-            filtered = filtered.filter(ticket => ticket.assignedSupportEngineer?.name === engineerName);
+            filtered = filtered.filter(ticket => 
+                engineerName === "Not Assigned" 
+                    ? !ticket.assignedSupportEngineer || !ticket.assignedSupportEngineer.name
+                    : ticket.assignedSupportEngineer?.name === engineerName
+            );
         }
-
+    
         // Apply additional filters
         if (filters.status) {
             filtered = filtered.filter(ticket => ticket.status === filters.status);
         }
         if (filters.engineer) {
-            filtered = filtered.filter(ticket => ticket.assignedSupportEngineer?.name === filters.engineer);
+            filtered = filtered.filter(ticket => 
+                filters.engineer === "Not Assigned"
+                    ? !ticket.assignedSupportEngineer || !ticket.assignedSupportEngineer.name
+                    : ticket.assignedSupportEngineer?.name === filters.engineer
+            );
         }
         if (filters.customer) {
             filtered = filtered.filter(ticket => ticket.customer.name === filters.customer);
@@ -138,50 +131,21 @@ const ReportPage = () => {
         if (filters.rating) {
             filtered = filtered.filter(ticket => ticket.rating === parseInt(filters.rating));
         }
-
-        // Date filtering
-        if (filters.dateRange !== "all" || customDateRange) {
-            const now = new Date();
-            let startDate;
+    
+        // Date filtering for custom range
+        if (customDateRange?.startDate && customDateRange?.endDate) {
+            const startDate = new Date(customDateRange.startDate);
+            const endDate = new Date(customDateRange.endDate);
+            endDate.setHours(23, 59, 59, 999); // End of the selected day
             
-            if (customDateRange && filters.dateRange === "custom") {
-                startDate = new Date(customDateRange.startDate);
-                const endDate = new Date(customDateRange.endDate);
-                endDate.setHours(23, 59, 59, 999); // End of the selected day
-                
-                filtered = filtered.filter(ticket => {
-                    const ticketDate = new Date(ticket.createdAt);
-                    return ticketDate >= startDate && ticketDate <= endDate;
-                });
-            } else {
-                switch (filters.dateRange) {
-                    case "today":
-                        startDate = new Date(now.setHours(0, 0, 0, 0));
-                        break;
-                    case "week":
-                        startDate = new Date(now);
-                        startDate.setDate(now.getDate() - 7);
-                        break;
-                    case "month":
-                        startDate = new Date(now);
-                        startDate.setMonth(now.getMonth() - 1);
-                        break;
-                    case "quarter":
-                        startDate = new Date(now);
-                        startDate.setMonth(now.getMonth() - 3);
-                        break;
-                    default:
-                        startDate = null;
-                }
-                
-                if (startDate) {
-                    filtered = filtered.filter(ticket => new Date(ticket.createdAt) >= startDate);
-                }
-            }
+            filtered = filtered.filter(ticket => {
+                const ticketDate = new Date(ticket.createdAt);
+                return ticketDate >= startDate && ticketDate <= endDate;
+            });
         }
-
+    
         setFilteredTickets(filtered);
-    };
+    };                
 
     // Handle additional filter changes
     const handleFilterChange = (key, value) => {
@@ -197,8 +161,7 @@ const ReportPage = () => {
             engineer: "",
             customer: "",
             priority: "",
-            rating: "",
-            dateRange: "all"
+            rating: ""
         });
         setMainFilter("all");
         setSelectedCompany("");
@@ -216,7 +179,11 @@ const ReportPage = () => {
         .filter(company => company && company.companyId)
         .filter((company, index, self) => self.findIndex(c => c.companyId === company.companyId) === index);
 
-    const uniqueEngineers = [...new Set(metrics.reportData.map(ticket => ticket.assignedSupportEngineer?.name))].filter(Boolean);
+        const uniqueEngineers = [...new Set(
+            metrics.reportData.map(ticket => 
+                ticket.assignedSupportEngineer?.name || "not_assigned"
+            )
+        )].filter(name => name !== "not_assigned"); // We'll handle "not_assigned" separately
 
     // Calculate summary statistics for filtered tickets
     const calculateStats = () => {
@@ -545,46 +512,25 @@ const ReportPage = () => {
                                 </div>
                             )}
                             
-                            {/* Date Range filter */}
+                            {/* Custom date range pickers */}
                             <div>
-                                <label className="block text-sm font-medium text-purple-200 mb-1">Date Range</label>
-                                <select
-                                    onChange={(e) => handleDateRangeChange(e.target.value)}
+                                <label className="block text-sm font-medium text-purple-200 mb-1">Start Date</label>
+                                <input
+                                    type="date"
+                                    value={dateRange.startDate}
+                                    onChange={(e) => handleCustomDateChange("startDate", e.target.value)}
                                     className="bg-white bg-opacity-20 backdrop-blur-md text-white border-none p-2 rounded-lg w-full focus:ring-2 focus:ring-purple-500"
-                                    value={selectedFilters.dateRange}
-                                >
-                                    <option value="all">All Time</option>
-                                    <option value="today">Today</option>
-                                    <option value="week">Last 7 Days</option>
-                                    <option value="month">Last 30 Days</option>
-                                    <option value="quarter">Last 90 Days</option>
-                                    <option value="custom">Custom Range</option>
-                                </select>
+                                />
                             </div>
-                            
-                            {/* Custom date range pickers (visible only when dateRange is "custom") */}
-                            {selectedFilters.dateRange === "custom" && (
-                                <>
-                                    <div>
-                                        <label className="block text-sm font-medium text-purple-200 mb-1">Start Date</label>
-                                        <input
-                                            type="date"
-                                            value={dateRange.startDate}
-                                            onChange={(e) => handleCustomDateChange("startDate", e.target.value)}
-                                            className="bg-white bg-opacity-20 backdrop-blur-md text-white border-none p-2 rounded-lg w-full focus:ring-2 focus:ring-purple-500"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-purple-200 mb-1">End Date</label>
-                                        <input
-                                            type="date"
-                                            value={dateRange.endDate}
-                                            onChange={(e) => handleCustomDateChange("endDate", e.target.value)}
-                                            className="bg-white bg-opacity-20 backdrop-blur-md text-white border-none p-2 rounded-lg w-full focus:ring-2 focus:ring-purple-500"
-                                        />
-                                    </div>
-                                </>
-                            )}
+                            <div>
+                                <label className="block text-sm font-medium text-purple-200 mb-1">End Date</label>
+                                <input
+                                    type="date"
+                                    value={dateRange.endDate}
+                                    onChange={(e) => handleCustomDateChange("endDate", e.target.value)}
+                                    className="bg-white bg-opacity-20 backdrop-blur-md text-white border-none p-2 rounded-lg w-full focus:ring-2 focus:ring-purple-500"
+                                />
+                            </div>
                         </div>
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -607,20 +553,21 @@ const ReportPage = () => {
 
                             {/* Engineer Filter */}
                             <div>
-                                <label className="block text-sm font-medium text-purple-200 mb-1">Support Engineer</label>
-                                <select
-                                    onChange={(e) => handleFilterChange('engineer', e.target.value)}
-                                    className="bg-white bg-opacity-20 backdrop-blur-md text-white border-none p-2 rounded-lg w-full focus:ring-2 focus:ring-purple-500"
-                                    value={selectedFilters.engineer}
-                                >
-                                    <option value="">All Engineers</option>
-                                    {Object.entries(metrics.ticketsByEngineer || {}).map(([engineer, count]) => (
-                                        <option key={engineer} value={engineer}>
-                                            {engineer} ({count})
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+    <label className="block text-sm font-medium text-purple-200 mb-1">Support Engineer</label>
+    <select
+        onChange={(e) => handleFilterChange('engineer', e.target.value)}
+        className="bg-white bg-opacity-20 backdrop-blur-md text-white border-none p-2 rounded-lg w-full focus:ring-2 focus:ring-purple-500"
+        value={selectedFilters.engineer}
+    >
+        <option value="">All Engineers</option>
+        <option value="Not Assigned">Not Assigned</option>
+        {Object.entries(metrics.ticketsByEngineer || {}).map(([engineer, count]) => (
+            <option key={engineer} value={engineer}>
+                {engineer} ({count})
+            </option>
+        ))}
+    </select>
+</div>
 
                             {/* Customer Filter */}
                             <div>
@@ -676,10 +623,69 @@ const ReportPage = () => {
                     </div>
                 )}
 
-                {/* Display filtered tickets */}
-                <div className="bg-white bg-opacity-10 backdrop-blur-md p-4 md:p-6 rounded-2xl shadow-2xl">
+                {/* Display filtered tickets in a table */}
+                <div className="bg-white bg-opacity-10 backdrop-blur-md p-4 md:p-6 rounded-2xl shadow-2xl overflow-x-auto">
                     {filteredTickets.length > 0 ? (
-                        <TicketList tickets={filteredTickets} />
+                        <table className="min-w-full divide-y divide-gray-200 divide-opacity-25">
+                            <thead className="bg-white bg-opacity-10">
+    <tr>
+        <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">ID</th>
+        <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Title</th>
+        <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Company</th>
+        <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Status</th>
+        <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Priority</th>
+        <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Customer</th>
+        <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Engineer</th>
+        <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Created</th>
+        <th className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Description</th>
+    </tr>
+</thead>
+<tbody className="divide-y divide-gray-200 divide-opacity-25">
+    {filteredTickets.map((ticket) => (
+        <tr key={ticket._id} className="hover:bg-white hover:bg-opacity-10 transition-colors">
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">{ticket.tid}</td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">{ticket.title}</td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                {ticket.company?.name || 'No Company'}
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                <span className={`px-2 py-1 rounded-full text-xs ${
+                    ticket.status === 'open' ? 'bg-blue-500' :
+                    ticket.status === 'in-progress' ? 'bg-yellow-500' :
+                    ticket.status === 'closed' ? 'bg-green-500' :
+                    'bg-gray-500'
+                }`}>
+                    {ticket.status}
+                </span>
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                <span className={`px-2 py-1 rounded-full text-xs ${
+                    ticket.priority === 1 ? 'bg-green-500' :
+                    ticket.priority === 2 ? 'bg-yellow-500' :
+                    ticket.priority === 3 ? 'bg-orange-500' :
+                    'bg-red-500'
+                }`}>
+                    {ticket.priority}
+                </span>
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">{ticket.customer.name}</td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                {ticket.assignedSupportEngineer?.name || 'Not Assigned'}
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                {new Date(ticket.createdAt).toLocaleDateString()}
+            </td>
+            <td className="px-6 py-4 text-sm text-white">
+                {ticket.description ? (
+                    ticket.description.length > 60 ? 
+                    `${ticket.description.substring(0, 60)}...` : 
+                    ticket.description
+                ) : 'No description'}
+            </td>
+        </tr>
+    ))}
+</tbody>
+                        </table>
                     ) : (
                         <div className="text-white text-center py-8">
                             No tickets match the selected filters.
@@ -691,4 +697,4 @@ const ReportPage = () => {
     );
 };
 
-export default ReportPage;  
+export default ReportPage;
