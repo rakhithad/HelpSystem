@@ -139,7 +139,16 @@ router.put('/update-ticket/:id', authenticateToken, async (req, res) => {
 });
 
 router.delete('/delete-ticket/:id', authenticateToken, async (req, res) => {
-    const { uid, reason } = req.body; // UID of the person deleting & reason for deletion
+    const { reason } = req.body;
+    const uid = req.user.uid;
+  
+    // Validate reason
+    if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
+      return res.status(400).json({ message: 'Reason is required and must be a non-empty string' });
+    }
+    if (reason.length > 500) {
+      return res.status(400).json({ message: 'Reason must not exceed 500 characters' });
+    }
   
     try {
       const ticket = await Ticket.findById(req.params.id);
@@ -147,18 +156,18 @@ router.delete('/delete-ticket/:id', authenticateToken, async (req, res) => {
         return res.status(404).json({ message: 'Ticket not found' });
       }
   
-      // Mark the ticket as deleted instead of removing
+      // Mark the ticket as deleted
       ticket.status = 'deleted';
       ticket.deletedBy = uid;
       ticket.deletedAt = new Date();
-      ticket.reason = reason;
+      ticket.reason = reason.trim();
       await ticket.save();
   
       // Prepare notification(s)
       const notifications = [];
       const customerUid = ticket.uid;
-      const engineerUid = ticket.assignedSupportEngineer;
-      const ticketId = ticket.tid;
+      const engineerUid = ticket.assignedSupportEngineer !== 'Not Assigned' ? ticket.assignedSupportEngineer : null;
+      const ticketId = ticket.tid.toString(); // Convert tid to string
   
       const message = `Ticket ${ticketId} has been deleted by ${uid}`;
   
@@ -169,7 +178,7 @@ router.delete('/delete-ticket/:id', authenticateToken, async (req, res) => {
             senderUid: uid,
             ticketId,
             message,
-            reason
+            reason: reason.trim()
           });
         }
         if (engineerUid) {
@@ -178,7 +187,7 @@ router.delete('/delete-ticket/:id', authenticateToken, async (req, res) => {
             senderUid: uid,
             ticketId,
             message,
-            reason
+            reason: reason.trim()
           });
         }
       } else if (uid === customerUid && engineerUid) {
@@ -187,7 +196,7 @@ router.delete('/delete-ticket/:id', authenticateToken, async (req, res) => {
           senderUid: uid,
           ticketId,
           message,
-          reason
+          reason: reason.trim()
         });
       } else if (uid === engineerUid && customerUid) {
         notifications.push({
@@ -195,23 +204,22 @@ router.delete('/delete-ticket/:id', authenticateToken, async (req, res) => {
           senderUid: uid,
           ticketId,
           message,
-          reason
+          reason: reason.trim()
         });
       }
   
       // Save notifications
-      await Notification.insertMany(notifications);
+      if (notifications.length > 0) {
+        console.log(`Sending ${notifications.length} notifications for ticket ${ticketId}`);
+        await Notification.insertMany(notifications);
+      }
   
       res.status(200).json({ message: 'Ticket marked as deleted and notifications sent.', ticket });
     } catch (error) {
-      console.error(error);
+      console.error('Error deleting ticket:', error);
       res.status(500).json({ message: 'Failed to delete ticket', error: error.message });
     }
   });
-  
-
-  
-
 
 router.get('/ticket-counts', async (req, res) => {
     const { role, uid } = req.headers;
