@@ -11,7 +11,19 @@ const userSchema = new mongoose.Schema({
     phoneNumber: { type: String, unique: true },
     location: { type: String },
     companyId: { type: String, ref: 'Company' },
-    avatar: { type: String }
+    avatar: { type: String },
+    userStatus: { 
+        type: String, 
+        enum: ['active', 'inactive'], 
+        default: 'active', 
+        required: true 
+    },
+    deletedBy: { type: String },
+    deletedAt: { type: Date },
+    reason: { type: String }
 });
+
+userSchema.index({ uid: 1 });
+userSchema.index({ userStatus: 1 });
 
 module.exports = mongoose.model('User', userSchema);

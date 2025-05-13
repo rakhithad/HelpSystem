@@ -76,26 +76,31 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 
-
-
-
-// View all tickets (Only accessible by Admin, Customers, and Support Engineers)
+// View all tickets
 router.get('/view-tickets', authenticateToken, async (req, res) => {
     try {
         const user = req.user;
 
-        if(!user) {
+        if (!user) {
             return res.status(403).json({ message: 'Access Denied' });
         }
 
+        let tickets;
+
         if (user.role === 'customer') {
-            // Customer can only see their own tickets
-            const tickets = await Ticket.find({ uid: user.uid });
-            return res.json({ tickets, role: user.role });
+            // Customers can only see their own tickets (not deleted)
+            tickets = await Ticket.find({ uid: user.uid, status: { $ne: 'deleted' } });
+        } else if (user.role === 'support') {
+            // Support engineers can only see tickets assigned to them (not deleted)
+            tickets = await Ticket.find({ assignedTo: user.uid, status: { $ne: 'deleted' } });
+        } else if (user.role === 'admin') {
+            // Admins can see all tickets (not deleted)
+            tickets = await Ticket.find({ status: { $ne: 'deleted' } });
         } else {
-            const tickets = await Ticket.find();
-            return res.json(tickets);
+            return res.status(403).json({ message: 'Invalid role' });
         }
+
+        return res.json({ tickets, role: user.role });
 
     } catch (error) {
         console.error(error);
@@ -104,38 +109,52 @@ router.get('/view-tickets', authenticateToken, async (req, res) => {
 });
 
 router.put('/update-ticket/:id', authenticateToken, async (req, res) => {
-    try {
-        const { status, priority, assignedSupportEngineer, description } = req.body;
-        const user = req.user;
+  const { status, priority, assignedSupportEngineer } = req.body;
+  const uid = req.user.uid;
+  const role = req.user.role;
 
-        // Find the ticket
-        const ticket = await Ticket.findById(req.params.id, );
-        if (!ticket) {
-            return res.status(404).json({ message: 'Ticket not found' });
-        }
-
-        // If the user is a customer, restrict updates to only the description
-        if (user.role === 'customer') {
-            if (Object.keys(req.body).some(key => key !== 'description')) {
-                return res.status(403).json({ message: 'You are only allowed to update the description.' });
-            }
-            ticket.description = description;
-        } else {
-            // For other roles, allow updates to status, priority, and assignedSupportEngineer
-            if (status) ticket.status = status;
-            if (priority) ticket.priority = priority;
-            if (assignedSupportEngineer) ticket.assignedSupportEngineer = assignedSupportEngineer;
-            if (description) ticket.description = description;
-        }
-
-        // Save the updated ticket
-        const updatedTicket = await ticket.save();
-
-        res.status(200).json(updatedTicket);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to update ticket', error: error.message });
+  try {
+    const ticket = await Ticket.findById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ message: 'Ticket not found' });
     }
+
+    // Authorization checks
+    if (role === 'customer' && ticket.uid !== uid) {
+      return res.status(403).json({ message: 'You can only update your own tickets' });
+    }
+    if (role === 'support_engineer' && ticket.assignedSupportEngineer !== uid) {
+      return res.status(403).json({ message: 'You can only update tickets assigned to you' });
+    }
+
+    // Validate updates
+    const updates = {};
+    if (status && ['not started', 'in progress', 'stuck', 'done'].includes(status)) {
+      updates.status = status;
+    }
+    if (priority && Number.isInteger(Number(priority)) && priority >= 1 && priority <= 5) {
+      updates.priority = Number(priority);
+    }
+    if (role === 'admin' && assignedSupportEngineer !== undefined) {
+      // Allow null to unassign or a valid UID
+      if (assignedSupportEngineer === null || (typeof assignedSupportEngineer === 'string' && assignedSupportEngineer.length > 0)) {
+        updates.assignedSupportEngineer = assignedSupportEngineer;
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: 'No valid updates provided' });
+    }
+
+    // Update ticket
+    Object.assign(ticket, updates);
+    await ticket.save();
+
+    res.status(200).json(ticket);
+  } catch (error) {
+    console.error('Error updating ticket:', error);
+    res.status(500).json({ message: 'Failed to update ticket', error: error.message });
+  }
 });
 
 router.delete('/delete-ticket/:id', authenticateToken, async (req, res) => {

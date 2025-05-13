@@ -8,6 +8,7 @@ const ManageTickets = () => {
   const [tickets, setTickets] = useState([]);
   const [filteredTickets, setFilteredTickets] = useState([]);
   const [supportEngineers, setSupportEngineers] = useState([]);
+  const [userRole, setUserRole] = useState('');
   const [filters, setFilters] = useState({ status: '', date: 'all' });
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -17,7 +18,7 @@ const ManageTickets = () => {
   const [deleteReason, setDeleteReason] = useState('');
   const navigate = useNavigate();
 
-  // Toggle sidebar and disable body scroll when open
+  // Toggle sidebar
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
@@ -67,22 +68,27 @@ const ManageTickets = () => {
       try {
         const token = localStorage.getItem('token');
 
+        // Fetch tickets
         const ticketsResponse = await axios.get(
           `${process.env.REACT_APP_BACKEND_BASEURL}/tickets/view-tickets`,
           {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${token}` },
           }
         );
-        setTickets(ticketsResponse.data);
-        setFilteredTickets(ticketsResponse.data);
+        setTickets(ticketsResponse.data.tickets);
+        setFilteredTickets(ticketsResponse.data.tickets);
+        setUserRole(ticketsResponse.data.role);
 
-        const engineersResponse = await axios.get(
-          `${process.env.REACT_APP_BACKEND_BASEURL}/auth/support-engineers`,
-          {
-            headers: { Authorization: `Bearer ${token}` }
-          }
-        );
-        setSupportEngineers(engineersResponse.data);
+        // Fetch support engineers (only for admins)
+        if (ticketsResponse.data.role === 'admin') {
+          const engineersResponse = await axios.get(
+            `${process.env.REACT_APP_BACKEND_BASEURL}/auth/support-engineers`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+          setSupportEngineers(engineersResponse.data);
+        }
       } catch (err) {
         setError('Failed to fetch data. Please try again.');
         console.error(err);
@@ -94,8 +100,13 @@ const ManageTickets = () => {
     fetchData();
   }, []);
 
-  // Apply filters
+  // Apply filters (only for admins)
   useEffect(() => {
+    if (userRole !== 'admin') {
+      setFilteredTickets(tickets);
+      return;
+    }
+
     let filtered = [...tickets];
 
     if (filters.status) {
@@ -124,7 +135,7 @@ const ManageTickets = () => {
     }
 
     setFilteredTickets(filtered);
-  }, [filters, tickets]);
+  }, [filters, tickets, userRole]);
 
   const handleFilterChange = useCallback((filterName, value) => {
     setFilters((prevFilters) => ({ ...prevFilters, [filterName]: value }));
@@ -144,27 +155,27 @@ const ManageTickets = () => {
           ticket._id === ticketId ? response.data : ticket
         )
       );
+      setError(null);
     } catch (err) {
-      alert('Failed to update ticket. Please try again.');
-      console.error(err);
+      const errorMessage =
+        err.response?.data?.message || 'Failed to update ticket. Please try again.';
+      setError(errorMessage);
+      console.error('Error updating ticket:', err);
     }
   }, []);
 
   const handleDeleteTicket = useCallback((ticketId) => {
-    if (!window.confirm('Are you sure you want to delete this ticket?')) {
-      return;
-    }
     setDeleteTicketId(ticketId);
     setIsDeleteModalOpen(true);
   }, []);
 
   const handleDeleteSubmit = useCallback(async () => {
     if (!deleteReason || deleteReason.trim().length === 0) {
-      alert('Reason is required.');
+      setError('Reason is required.');
       return;
     }
     if (deleteReason.length > 500) {
-      alert('Reason must not exceed 500 characters.');
+      setError('Reason must not exceed 500 characters.');
       return;
     }
 
@@ -174,31 +185,34 @@ const ManageTickets = () => {
         `${process.env.REACT_APP_BACKEND_BASEURL}/tickets/delete-ticket/${deleteTicketId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
-          data: { reason: deleteReason.trim() }
+          data: { reason: deleteReason.trim() },
         }
       );
 
-      alert('Ticket deleted successfully.');
       setTickets((prevTickets) =>
         prevTickets.filter((ticket) => ticket._id !== deleteTicketId)
       );
       setIsDeleteModalOpen(false);
       setDeleteReason('');
       setDeleteTicketId(null);
+      setError(null);
+      alert('Ticket deleted successfully.');
     } catch (err) {
       const errorMessage =
         err.response?.data?.message || 'Failed to delete ticket. Please try again.';
-      alert(errorMessage);
-      console.error(err);
+      setError(errorMessage);
+      console.error('Error deleting ticket:', err);
     }
   }, [deleteTicketId, deleteReason]);
 
-  if (error) return <div className="text-red-400 p-8">{error}</div>;
+  if (error && !isDeleteModalOpen) {
+    return <div className="text-red-400 p-8">{error}</div>;
+  }
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-blue-900 overflow-hidden">
-      {/* Delete Modal */}
-      {isDeleteModalOpen && (
+      {/* Delete Modal (for admins and customers) */}
+      {isDeleteModalOpen && (userRole === 'admin' || userRole === 'customer') && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white bg-opacity-10 backdrop-blur-md p-6 rounded-2xl shadow-2xl max-w-md w-full">
             <h2 className="text-xl text-white mb-4">Delete Ticket</h2>
@@ -211,12 +225,14 @@ const ManageTickets = () => {
               className="w-full p-2 bg-white bg-opacity-10 text-white rounded-lg border border-white border-opacity-20"
               rows="4"
             />
+            {error && <p className="text-red-400 mt-2">{error}</p>}
             <div className="flex justify-end mt-4 gap-2">
               <button
                 onClick={() => {
                   setIsDeleteModalOpen(false);
                   setDeleteReason('');
                   setDeleteTicketId(null);
+                  setError(null);
                 }}
                 className="px-4 py-2 bg-gray-500 text-white rounded-lg"
               >
@@ -250,7 +266,7 @@ const ManageTickets = () => {
       >
         <div className="p-4 lg:p-8 space-y-8">
           <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-300">
-            Manage Tickets
+            {userRole === 'customer' ? 'My Tickets' : 'Manage Tickets'}
           </h1>
 
           <nav className="text-white text-opacity-80 mb-4">
@@ -258,51 +274,59 @@ const ManageTickets = () => {
               Dashboard
             </Link>{' '}
             {' / '}
-            <Link to="/admin-dashboard" className="hover:underline">
-              Admin Dashboard
-            </Link>{' '}
-            {' / '}
-            <span className="text-purple-300">Manage Tickets</span>
+            {userRole === 'admin' && (
+              <>
+                <Link to="/admin-dashboard" className="hover:underline">
+                  Admin Dashboard
+                </Link>{' '}
+                {' / '}
+              </>
+            )}
+            <span className="text-purple-300">
+              {userRole === 'customer' ? 'My Tickets' : 'Manage Tickets'}
+            </span>
           </nav>
 
-          {/* Filters */}
-          <div className="filters p-6 bg-white bg-opacity-10 backdrop-blur-md rounded-2xl shadow-2xl">
-            <div className="flex flex-wrap gap-4">
-              <div>
-                <label className="block text-white text-opacity-80 font-semibold mb-2">
-                  Status:
-                </label>
-                <select
-                  value={filters.status}
-                  onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className="px-4 py-2 bg-white bg-opacity-10 backdrop-blur-md text-white rounded-lg border border-white border-opacity-20 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  <option value="">All</option>
-                  <option value="not started">Not Started</option>
-                  <option value="in progress">In Progress</option>
-                  <option value="stuck">Stuck</option>
-                  <option value="done">Done</option>
-                  <option value="deleted">Deleted</option>
-                </select>
-              </div>
+          {/* Filters (only for admins) */}
+          {userRole === 'admin' && (
+            <div className="filters p-6 bg-white bg-opacity-10 backdrop-blur-md rounded-2xl shadow-2xl">
+              <div className="flex flex-wrap gap-4">
+                <div>
+                  <label className="block text-white text-opacity-80 font-semibold mb-2">
+                    Status:
+                  </label>
+                  <select
+                    value={filters.status}
+                    onChange={(e) => handleFilterChange('status', e.target.value)}
+                    className="px-4 py-2 bg-white bg-opacity-10 backdrop-blur-md text-white rounded-lg border border-white border-opacity-20 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="">All</option>
+                    <option value="not started">Not Started</option>
+                    <option value="in progress">In Progress</option>
+                    <option value="stuck">Stuck</option>
+                    <option value="done">Done</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
 
-              <div>
-                <label className="block text-white text-opacity-80 font-semibold mb-2">
-                  Date:
-                </label>
-                <select
-                  value={filters.date}
-                  onChange={(e) => handleFilterChange('date', e.target.value)}
-                  className="px-4 py-2 bg-white bg-opacity-10 backdrop-blur-md text-white rounded-lg border border-white border-opacity-20 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  <option value="all">All Time</option>
-                  <option value="today">Today</option>
-                  <option value="this week">This Week</option>
-                  <option value="this month">This Month</option>
-                </select>
+                <div>
+                  <label className="block text-white text-opacity-80 font-semibold mb-2">
+                    Date:
+                  </label>
+                  <select
+                    value={filters.date}
+                    onChange={(e) => handleFilterChange('date', e.target.value)}
+                    className="px-4 py-2 bg-white bg-opacity-10 backdrop-blur-md text-white rounded-lg border border-white border-opacity-20 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="all">All Time</option>
+                    <option value="today">Today</option>
+                    <option value="this week">This Week</option>
+                    <option value="this month">This Month</option>
+                  </select>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Loading Spinner */}
           {isLoading && (
@@ -312,7 +336,9 @@ const ManageTickets = () => {
           )}
 
           {/* Tickets List */}
-          <div className="p-6 bg-white bg-opacity-10 backdrop-blur-md rounded-2xl shadow-2xl">
+          <div className="p-6 bg-white bg-opacity-10 backdrop-blur-md rounded-2xl shadow-2xl
+
+">
             {filteredTickets.length === 0 ? (
               <p className="text-white text-opacity-80">No tickets available.</p>
             ) : (
@@ -329,6 +355,7 @@ const ManageTickets = () => {
                       {ticket.status} - Priority: {ticket.priority}
                     </span>
                     <div className="mt-4 flex flex-wrap gap-4">
+                      {/* Status Update */}
                       <div>
                         <label className="block text-white text-opacity-80 font-semibold mb-2">
                           Status:
@@ -344,9 +371,9 @@ const ManageTickets = () => {
                           <option value="in progress">In Progress</option>
                           <option value="stuck">Stuck</option>
                           <option value="done">Done</option>
-                          <option value="deleted">Deleted</option>
                         </select>
                       </div>
+                      {/* Priority Update */}
                       <div>
                         <label className="block text-white text-opacity-80 font-semibold mb-2">
                           Priority:
@@ -357,40 +384,46 @@ const ManageTickets = () => {
                           min="1"
                           max="5"
                           onChange={(e) =>
-                            handleUpdateTicket(ticket._id, { priority: e.target.value })
+                            handleUpdateTicket(ticket._id, { priority: Number(e.target.value) })
                           }
                           className="px-4 py-2 bg-white bg-opacity-10 backdrop-blur-md text-white rounded-lg border border-white border-opacity-20 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent w-20"
                         />
                       </div>
-                      <div>
-                        <label className="block text-white text-opacity-80 font-semibold mb-2">
-                          Assign to:
-                        </label>
-                        <select
-                          value={ticket.assignedSupportEngineer || ''}
-                          onChange={(e) =>
-                            handleUpdateTicket(ticket._id, {
-                              assignedSupportEngineer: e.target.value || null
-                            })
-                          }
-                          className="px-4 py-2 bg-white bg-opacity-10 backdrop-blur-md text-white rounded-lg border border-white border-opacity-20 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        >
-                          <option value="">Not Assigned</option>
-                          {supportEngineers.map((engineer) => (
-                            <option key={engineer.uid} value={engineer.uid}>
-                              {engineer.firstName}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="flex items-end">
-                        <button
-                          onClick={() => handleDeleteTicket(ticket._id)}
-                          className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all duration-300"
-                        >
-                          Delete Ticket
-                        </button>
-                      </div>
+                      {/* Assign Engineer (only for admins) */}
+                      {userRole === 'admin' && (
+                        <div>
+                          <label className="block text-white text-opacity-80 font-semibold mb-2">
+                            Assign to:
+                          </label>
+                          <select
+                            value={ticket.assignedSupportEngineer || ''}
+                            onChange={(e) =>
+                              handleUpdateTicket(ticket._id, {
+                                assignedSupportEngineer: e.target.value || null,
+                              })
+                            }
+                            className="px-4 py-2 bg-white bg-opacity-10 backdrop-blur-md text-white rounded-lg border border-white border-opacity-20 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          >
+                            <option value="">Not Assigned</option>
+                            {supportEngineers.map((engineer) => (
+                              <option key={engineer.uid} value={engineer.uid}>
+                                {engineer.firstName} {engineer.lastName}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      {/* Delete Button (for admins and ticket owners) */}
+                      {(userRole === 'admin' || (userRole === 'customer' && ticket.uid === localStorage.getItem('uid'))) && (
+                        <div className="flex items-end">
+                          <button
+                            onClick={() => handleDeleteTicket(ticket._id)}
+                            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all duration-300"
+                          >
+                            Delete Ticket
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </li>
                 ))}

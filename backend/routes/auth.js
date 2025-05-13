@@ -5,7 +5,10 @@ const User = require('../models/User');
 require('dotenv').config();
 const Counter = require('../models/counter');
 const Company = require('../models/Company');
+const Ticket = require('../models/Ticket');
+const Notification = require('../models/notification');
 const authenticateToken = require('../middleware/authenticateToken');
+
 
 const router = express.Router();
 
@@ -169,19 +172,85 @@ router.get('/users', authenticateToken, async (req, res) => {
 
 
 router.delete('/users/:id', authenticateToken, async (req, res) => {
+    const { reason } = req.body;
+    const uid = req.user.uid;
+
+    // Restrict deletion to admins
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Only admins can delete users' });
+    }
+
+    // Validate reason
+    if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
+        return res.status(400).json({ message: 'Reason is required and must be a non-empty string' });
+    }
+    if (reason.length > 500) {
+        return res.status(400).json({ message: 'Reason must not exceed 500 characters' });
+    }
+
     try {
-        const user = await User.findByIdAndDelete(req.params.id);
+        const user = await User.findById(req.params.id);
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
-        res.status(200).json({ message: 'User deleted successfully', user });
+
+        // Prevent deleting self
+        if (user.uid === uid) {
+            return res.status(400).json({ message: 'Admins cannot delete themselves' });
+        }
+
+        // Mark user as inactive
+        user.userStatus = 'inactive';
+        user.deletedBy = uid;
+        user.deletedAt = new Date();
+        user.reason = reason.trim();
+        await user.save();
+
+        // Update related tickets
+        await Ticket.updateMany(
+            {
+                $or: [
+                    { uid: user.uid },
+                    { assignedSupportEngineer: user.uid }
+                ],
+                status: { $ne: 'deleted' }
+            },
+            {
+                status: 'inactive',
+                deletedBy: uid,
+                deletedAt: new Date(),
+                reason: `User ${user.uid} was deleted: ${reason.trim()}`
+            }
+        );
+
+        // Create notification for the deleted user
+        try {
+            await Notification.create({
+                receiverUid: user.uid,
+                senderUid: uid,
+                ticketId: null, // Explicitly set to null for user deletions
+                message: `Your account has been deleted by admin ${uid}`,
+                reason: reason.trim()
+            });
+        } catch (notificationError) {
+            console.warn('Failed to create notification:', notificationError);
+            // Continue with success response, but include a warning
+            return res.status(200).json({
+                message: 'User marked as inactive and related tickets updated, but notification failed',
+                user,
+                warning: 'Notification could not be sent'
+            });
+        }
+
+        res.status(200).json({
+            message: 'User marked as inactive, related tickets updated, and notification sent',
+            user
+        });
     } catch (error) {
-        console.error('Error deleting user:', error);
+        console.error('Error soft-deleting user:', error);
         res.status(500).json({ message: 'Failed to delete user', error: error.message });
     }
 });
-
-
 
 
 // routes/userRoutes.js

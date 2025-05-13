@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const notificationSchema = new mongoose.Schema({
   receiverUid: { type: String, required: true },
   senderUid: { type: String, required: true },
-  ticketId: { type: String, required: true },
+  ticketId: { type: String },
   message: { type: String, required: true },
   reason: { type: String },
   deletedAt: { type: Date, default: Date.now },
