@@ -8,7 +8,7 @@ const CreateTicket = () => {
     const [formData, setFormData] = useState({
         title: '',
         description: '',
-        priority: 1,
+        priority: 1, // Default priority
         customerUid: '',
         assignedSupportEngineer: '',
     });
@@ -33,14 +33,17 @@ const CreateTicket = () => {
         const handleClickOutside = (event) => {
             const sidebar = document.querySelector('.sidebar-container');
             const toggleButton = document.querySelector('.sidebar-toggle');
-            
-            if (window.innerWidth < 1024 && isSidebarOpen && 
-                sidebar && !sidebar.contains(event.target) && 
-                toggleButton && !toggleButton.contains(event.target)) {
+            if (
+                window.innerWidth < 1024 &&
+                isSidebarOpen &&
+                sidebar &&
+                !sidebar.contains(event.target) &&
+                toggleButton &&
+                !toggleButton.contains(event.target)
+            ) {
                 setIsSidebarOpen(false);
             }
         };
-
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isSidebarOpen]);
@@ -48,11 +51,7 @@ const CreateTicket = () => {
     // Disable body scroll when sidebar is open on mobile
     useEffect(() => {
         if (window.innerWidth < 1024) {
-            if (isSidebarOpen) {
-                document.body.style.overflow = 'hidden';
-            } else {
-                document.body.style.overflow = 'auto';
-            }
+            document.body.style.overflow = isSidebarOpen ? 'hidden' : 'auto';
         }
         return () => {
             document.body.style.overflow = 'auto';
@@ -63,28 +62,25 @@ const CreateTicket = () => {
     useEffect(() => {
         if (token) {
             setIsLoading(true);
-
-            // Fetch user role
-            axios.get(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/user-role`, {
-                headers: { Authorization: `Bearer ${token}` },
-            })
+            axios
+                .get(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/user-role`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                })
                 .then((response) => {
                     setRole(response.data.role);
-
-                    // Fetch customers (for admin & support engineers)
                     if (response.data.role === 'admin' || response.data.role === 'support_engineer') {
-                        axios.get(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/customers`, {
-                            headers: { Authorization: `Bearer ${token}` },
-                        })
+                        axios
+                            .get(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/customers`, {
+                                headers: { Authorization: `Bearer ${token}` },
+                            })
                             .then((response) => setCustomers(response.data))
                             .catch((error) => console.error('Failed to fetch customers:', error));
                     }
-
-                    // Fetch support engineers (only for admin)
                     if (response.data.role === 'admin') {
-                        axios.get(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/support-engineers`, {
-                            headers: { Authorization: `Bearer ${token}` },
-                        })
+                        axios
+                            .get(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/support-engineers`, {
+                                headers: { Authorization: `Bearer ${token}` },
+                            })
                             .then((response) => setSupportEngineers(response.data))
                             .catch((error) => console.error('Failed to fetch support engineers:', error));
                     }
@@ -109,9 +105,14 @@ const CreateTicket = () => {
             try {
                 let requestData = { ...formData };
 
+                // For customers, ensure priority is set to 1
+                if (role === 'customer') {
+                    requestData.priority = 1;
+                }
+
                 // If the user is a support engineer, auto-assign themselves
                 if (role === 'support_engineer') {
-                    requestData.assignedSupportEngineer = 'self'; // Backend will replace this with req.user.uid
+                    requestData.assignedSupportEngineer = 'self';
                 }
 
                 await axios.post(`${process.env.REACT_APP_BACKEND_BASEURL}/tickets`, requestData, {
@@ -119,7 +120,13 @@ const CreateTicket = () => {
                 });
 
                 setSuccess('Ticket created successfully!');
-                setFormData({ title: '', description: '', priority: 1, customerUid: '', assignedSupportEngineer: '' });
+                setFormData({
+                    title: '',
+                    description: '',
+                    priority: 1,
+                    customerUid: '',
+                    assignedSupportEngineer: '',
+                });
             } catch (err) {
                 setError('Failed to create ticket. Please try again.');
             } finally {
@@ -135,48 +142,39 @@ const CreateTicket = () => {
 
     return (
         <div className="flex h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-blue-900 overflow-hidden">
-
-            {/* Sidebar - Now appears above content on mobile */}
             <Sidebar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
-
-            {/* Semi-transparent overlay for mobile */}
             {isSidebarOpen && (
-                <div 
+                <div
                     className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
                     onClick={() => setIsSidebarOpen(false)}
                 />
             )}
-
-            {/* Main Content */}
             <div className={`flex-1 pb-20 overflow-y-auto transition-all duration-300 lg:ml-64`}>
                 <div className="p-4 lg:p-8 max-w-4xl mx-auto">
                     <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-300 mb-6">
                         Create a New Ticket
                     </h2>
                     <nav className="text-white text-opacity-80 mb-6">
-                        <Link to="/dashboard" className="hover:underline">Dashboard</Link> {' / '}
+                        <Link to="/dashboard" className="hover:underline">
+                            Dashboard
+                        </Link>{' '}
+                        {' / '}
                         <span className="text-purple-300">Create a ticket</span>
                     </nav>
-
-                    {/* Loading Spinner */}
                     {isLoading && (
                         <div className="flex justify-center items-center">
                             <FaSpinner className="animate-spin h-6 w-6 text-purple-400" />
                         </div>
                     )}
-
-                    {/* Error Message */}
                     {error && <p className="text-red-400 mb-4">{error}</p>}
-
-                    {/* Success Message */}
                     {success && <p className="text-green-400 mb-4">{success}</p>}
-
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Left Column */}
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-white text-opacity-80 font-semibold mb-2">Title:</label>
+                                    <label className="block text-white text-opacity-80 font-semibold mb-2">
+                                        Title:
+                                    </label>
                                     <input
                                         type="text"
                                         name="title"
@@ -186,9 +184,10 @@ const CreateTicket = () => {
                                         className="w-full p-3 rounded-lg bg-white bg-opacity-10 backdrop-blur-sm text-white placeholder-white placeholder-opacity-50 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-white border-opacity-20"
                                     />
                                 </div>
-
                                 <div>
-                                    <label className="block text-white text-opacity-80 font-semibold mb-2">Description:</label>
+                                    <label className="block text-white text-opacity-80 font-semibold mb-2">
+                                        Description:
+                                    </label>
                                     <textarea
                                         name="description"
                                         value={formData.description}
@@ -199,27 +198,30 @@ const CreateTicket = () => {
                                     />
                                 </div>
                             </div>
-
-                            {/* Right Column */}
                             <div className="space-y-4">
-                                <div>
-                                    <label className="block text-white text-opacity-80 font-semibold mb-2">Priority (1-5):</label>
-                                    <input
-                                        type="number"
-                                        name="priority"
-                                        value={formData.priority}
-                                        onChange={handleChange}
-                                        min="1"
-                                        max="5"
-                                        required
-                                        className="w-full p-3 rounded-lg bg-white bg-opacity-10 backdrop-blur-sm text-white placeholder-white placeholder-opacity-50 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-white border-opacity-20"
-                                    />
-                                </div>
-
-                                {/* Assign Customer (Admins & Support Engineers) */}
+                                {/* Show priority field only for admin and support engineer */}
+                                {(role === 'admin' || role === 'support_engineer') && (
+                                    <div>
+                                        <label className="block text-white text-opacity-80 font-semibold mb-2">
+                                            Priority (1-5):
+                                        </label>
+                                        <input
+                                            type="number"
+                                            name="priority"
+                                            value={formData.priority}
+                                            onChange={handleChange}
+                                            min="1"
+                                            max="5"
+                                            required
+                                            className="w-full p-3 rounded-lg bg-white bg-opacity-10 backdrop-blur-sm text-white placeholder-white placeholder-opacity-50 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-white border-opacity-20"
+                                        />
+                                    </div>
+                                )}
                                 {customers.length > 0 && (
                                     <div>
-                                        <label className="block text-white text-opacity-80 font-semibold mb-2">Assign Customer:</label>
+                                        <label className="block text-white text-opacity-80 font-semibold mb-2">
+                                            Assign Customer:
+                                        </label>
                                         <select
                                             name="customerUid"
                                             value={formData.customerUid}
@@ -236,11 +238,11 @@ const CreateTicket = () => {
                                         </select>
                                     </div>
                                 )}
-
-                                {/* Assign Support Engineer (Admins Only) */}
                                 {role === 'admin' && supportEngineers.length > 0 && (
                                     <div>
-                                        <label className="block text-white text-opacity-80 font-semibold mb-2">Assign Support Engineer:</label>
+                                        <label className="block text-white text-opacity-80 font-semibold mb-2">
+                                            Assign Support Engineer:
+                                        </label>
                                         <select
                                             name="assignedSupportEngineer"
                                             value={formData.assignedSupportEngineer}
@@ -257,8 +259,6 @@ const CreateTicket = () => {
                                         </select>
                                     </div>
                                 )}
-
-                                {/* Register New User Button */}
                                 {(role === 'admin' || role === 'support_engineer') && (
                                     <button
                                         type="button"
@@ -270,8 +270,6 @@ const CreateTicket = () => {
                                 )}
                             </div>
                         </div>
-
-                        {/* Submit Button - Full width below the columns */}
                         <div className="pt-4">
                             <button
                                 type="submit"
@@ -284,28 +282,21 @@ const CreateTicket = () => {
                     </form>
                 </div>
             </div>
-
-            {/* Mobile Navigation Bar */}
             <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-gray-800 bg-opacity-90 backdrop-blur-md border-t border-purple-500 border-opacity-20 z-50">
                 <div className="flex justify-around items-center p-3">
-                    {/* Sidebar Toggle Button */}
-                    <button 
+                    <button
                         onClick={toggleSidebar}
                         className="p-3 text-purple-400 hover:text-white transition-colors"
                     >
                         <FaBars className="w-5 h-5" />
                     </button>
-                    
-                    {/* Home Button */}
-                    <button 
+                    <button
                         onClick={() => navigate('/dashboard')}
                         className="p-3 text-purple-400 hover:text-white transition-colors"
                     >
                         <FaHome className="w-5 h-5" />
                     </button>
-                    
-                    {/* Account Button */}
-                    <button 
+                    <button
                         onClick={() => navigate('/account')}
                         className="p-3 text-purple-400 hover:text-white transition-colors"
                     >

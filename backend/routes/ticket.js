@@ -11,47 +11,84 @@ const router = express.Router();
 router.post('/', authenticateToken, async (req, res) => {
     try {
         const { title, description, priority, customerUid, assignedSupportEngineer } = req.body;
-        const userRole = req.user.role;
-        const userUid = req.user.uid;
+        const { role: userRole, uid: userUid, id: userId } = req.user;
+
+        // Fetch user status
+        const user = await User.findById(userId).select('userStatus');
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        if (user.userStatus === 'inactive') {
+            return res.status(403).json({ message: 'Access Denied: Your account is inactive' });
+        }
 
         // Validate required fields
-        if (!title || !description || !priority) {
-            return res.status(400).json({ message: 'Missing required fields' });
+        if (!title || !description) {
+            return res.status(400).json({ message: 'Title and description are required' });
+        }
+
+        let finalPriority;
+
+        // Validate priority based on role
+        if (userRole === 'customer') {
+            // Customers get default priority of 1
+            finalPriority = 1;
+        } else {
+            // Admins and support engineers must provide priority
+            if (!priority) {
+                return res.status(400).json({ message: 'Priority is required for admins and support engineers' });
+            }
+            // Ensure priority is a number between 1 and 5
+            const priorityNum = parseInt(priority, 10);
+            if (isNaN(priorityNum) || priorityNum < 1 || priorityNum > 5) {
+                return res.status(400).json({ message: 'Priority must be a number between 1 and 5' });
+            }
+            finalPriority = priorityNum;
         }
 
         let finalCustomerUid;
-        let finalAssignedEngineer = null; // Default to null unless assigned
+        let finalAssignedEngineer = null;
 
+        // Role-based logic
         if (userRole === 'admin') {
-            // Admin must provide a customer and support engineer
             if (!customerUid || !assignedSupportEngineer) {
-                return res.status(400).json({ message: 'Admin must assign a customer and a support engineer' });
+                return res.status(400).json({ message: 'Admin must provide customerUid and assignedSupportEngineer' });
+            }
+            const customer = await User.findOne({ uid: customerUid, role: 'customer' });
+            if (!customer) {
+                return res.status(400).json({ message: 'Invalid customer UID' });
+            }
+            const engineer = await User.findOne({ uid: assignedSupportEngineer, role: 'support_engineer' });
+            if (!engineer) {
+                return res.status(400).json({ message: 'Invalid support engineer UID' });
             }
             finalCustomerUid = customerUid;
             finalAssignedEngineer = assignedSupportEngineer;
         } else if (userRole === 'support_engineer') {
-            // Support engineers must select a customer, and they assign themselves
             if (!customerUid) {
-                return res.status(400).json({ message: 'Support engineer must assign a customer' });
+                return res.status(400).json({ message: 'Support engineer must provide customerUid' });
+            }
+            const customer = await User.findOne({ uid: customerUid, role: 'customer' });
+            if (!customer) {
+                return res.status(400).json({ message: 'Invalid customer UID' });
             }
             finalCustomerUid = customerUid;
             finalAssignedEngineer = userUid;
         } else if (userRole === 'customer') {
-            // Customers create their own ticket, no assigned support engineer
             finalCustomerUid = userUid;
         } else {
-            return res.status(403).json({ message: 'Unauthorized: Only admins, support engineers, and customers can create tickets' });
+            return res.status(403).json({ message: 'Unauthorized: Invalid role for creating tickets' });
         }
 
-        // Increment the ticket counter
+        // Increment ticket counter
         const counter = await Counter.findOneAndUpdate(
             { name: 'ticket_tid' },
             { $inc: { count: 1 } },
             { new: true, upsert: true }
         );
 
-        if (!counter) {
-            throw new Error('Failed to initialize or update ticket counter');
+        if (!counter || !counter.count) {
+            throw new Error('Failed to increment ticket counter');
         }
 
         const tid = counter.count;
@@ -61,17 +98,34 @@ router.post('/', authenticateToken, async (req, res) => {
             tid,
             title,
             description,
-            priority,
-            uid: finalCustomerUid, // Assign customer UID
-            assignedSupportEngineer: finalAssignedEngineer, // Assign based on role
-            status: "not started",
+            priority: finalPriority,
+            uid: finalCustomerUid,
+            assignedSupportEngineer: finalAssignedEngineer,
+            status: 'not started',
         });
 
         await newTicket.save();
-        res.status(201).json(newTicket);
+
+        return res.status(201).json({
+            message: 'Ticket created successfully',
+            ticket: newTicket,
+        });
     } catch (error) {
-        console.error('Error creating ticket:', error);
-        res.status(500).json({ message: 'Failed to create ticket', error: error.message });
+        console.error('Error creating ticket:', {
+            error: error.message,
+            userId: req.user?.id,
+            role: req.user?.role,
+            body: req.body,
+        });
+
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ message: 'Invalid ticket data', details: error.message });
+        }
+        if (error.name === 'MongoServerError' && error.code === 11000) {
+            return res.status(400).json({ message: 'Duplicate ticket ID' });
+        }
+
+        return res.status(500).json({ message: 'Failed to create ticket' });
     }
 });
 

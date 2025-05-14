@@ -67,7 +67,7 @@ router.post('/register', async (req, res) => {
         const token = jwt.sign(
             { id: newUser._id, email: newUser.email, uid: newUser.uid, role: newUser.role },
             process.env.JWT_SECRET,
-            { expiresIn: '1h' } // Token valid for 1 hour
+            { expiresIn: '1h' } 
         );
 
         res.status(201).json({ message: 'User registered successfully', token });
@@ -128,18 +128,21 @@ router.post('/login', async (req, res) => {
 
 router.get('/support-engineers', authenticateToken, async (req, res) => {
     try {
-        const supportEngineers = await User.find({ role: 'support_engineer' }, 'firstName uid');
+        const supportEngineers = await User.find(
+            { role: 'support_engineer', userStatus: 'active' },
+            'firstName uid'
+        );
         res.status(200).json(supportEngineers);
         console.log('Support Engineers:', supportEngineers);
     } catch (error) {
-        console.error(error);
+        console.error('Error fetching support engineers:', error);
         res.status(500).json({ message: 'Failed to fetch support engineers' });
     }
 });
 
 router.get('/customers', authenticateToken, async (req, res) => {
     try {
-        const customers = await User.find({ role: 'customer' }).select('uid firstName lastName');
+        const customers = await User.find({ role: 'customer', userStatus: 'active' }).select('uid firstName lastName');
         res.json(customers);
     } catch (error) {
         console.error('Error fetching customers:', error);
