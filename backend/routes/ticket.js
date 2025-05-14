@@ -143,13 +143,13 @@ router.get('/view-tickets', authenticateToken, async (req, res) => {
 
         if (user.role === 'customer') {
             // Customers can only see their own tickets (not deleted)
-            tickets = await Ticket.find({ uid: user.uid, status: { $ne: 'deleted' } });
+            tickets = await Ticket.find({ uid: user.uid, status: { $ne: 'inactive' } });
         } else if (user.role === 'support') {
             // Support engineers can only see tickets assigned to them (not deleted)
-            tickets = await Ticket.find({ assignedTo: user.uid, status: { $ne: 'deleted' } });
+            tickets = await Ticket.find({ assignedTo: user.uid, status: { $ne: 'inactive' } });
         } else if (user.role === 'admin') {
             // Admins can see all tickets (not deleted)
-            tickets = await Ticket.find({ status: { $ne: 'deleted' } });
+            tickets = await Ticket.find({ status: { $ne: 'inactive' } });
         } else {
             return res.status(403).json({ message: 'Invalid role' });
         }
@@ -511,6 +511,138 @@ router.get('/reviews', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Failed to fetch reviews' });
+    }
+});
+
+
+router.get('/tickets-by-status-with-company', authenticateToken, async (req, res) => {
+    try {
+        const { type } = req.query;
+        const { role, uid } = req.user;
+
+        // Define status mapping based on type
+        let query = {};
+        if (type === 'open') query.status = 'not started';
+        else if (type === 'pending') query.status = 'in progress';
+        else if (type === 'solved') query.status = 'done';
+        else if (type === 'unassigned') query.assignedSupportEngineer = null;
+        else {
+            return res.status(400).json({ message: 'Invalid ticket type' });
+        }
+
+        
+        if (role === 'customer') {
+            query.uid = uid;
+        } else if (role === 'support_engineer') {
+            query.assignedSupportEngineer = uid;
+        }
+
+        // Fetch tickets with user and company details
+        const tickets = await Ticket.aggregate([
+            { $match: query },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'uid',
+                    foreignField: 'uid',
+                    as: 'user',
+                },
+            },
+            { $unwind: '$user' },
+            {
+                $lookup: {
+                    from: 'companies',
+                    localField: 'user.companyId',
+                    foreignField: 'companyId',
+                    as: 'company',
+                },
+            },
+            { $unwind: { path: '$company', preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    tid: 1,
+                    title: 1,
+                    priority: 1,
+                    assignedSupportEngineer: 1,
+                    createdAt: 1,
+                    companyName: '$company.name',
+                },
+            },
+        ]);
+
+        res.status(200).json(tickets);
+    } catch (error) {
+        console.error('Error fetching tickets with company:', {
+            error: error.message,
+            userId: req.user?.id,
+            role: req.user?.role,
+            query: req.query,
+        });
+        res.status(500).json({ message: 'Failed to fetch tickets' });
+    }
+});
+
+
+router.get('/view-tickets-with-company', authenticateToken, async (req, res) => {
+    try {
+        const { role, uid } = req.user;
+
+        // Define query based on role
+        let query = {};
+        if (role === 'customer') {
+            query.uid = uid;
+        } else if (role === 'support_engineer') {
+            query.assignedSupportEngineer = uid;
+        } // Admins get all tickets
+
+        // Exclude inactive and deleted tickets
+        query.status = { $nin: ['inactive', 'deleted'] };
+
+        // Fetch tickets with user and company details
+        const tickets = await Ticket.aggregate([
+            { $match: query },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'uid',
+                    foreignField: 'uid',
+                    as: 'user',
+                },
+            },
+            { $unwind: '$user' },
+            {
+                $lookup: {
+                    from: 'companies',
+                    localField: 'user.companyId',
+                    foreignField: 'companyId',
+                    as: 'company',
+                },
+            },
+            { $unwind: { path: '$company', preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    _id: 1,
+                    tid: 1,
+                    title: 1,
+                    description: 1,
+                    uid: 1,
+                    status: 1,
+                    priority: 1,
+                    assignedSupportEngineer: 1,
+                    createdAt: 1,
+                    companyName: '$company.name',
+                },
+            },
+        ]);
+
+        res.status(200).json({ tickets, role });
+    } catch (error) {
+        console.error('Error fetching tickets with company:', {
+            error: error.message,
+            userId: req.user?.id,
+            role: req.user?.role,
+        });
+        res.status(500).json({ message: 'Failed to fetch tickets' });
     }
 });
 

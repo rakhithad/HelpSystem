@@ -4,15 +4,15 @@ import { Link, useNavigate } from 'react-router-dom';
 import { FaSpinner, FaBars, FaHome, FaUser, FaPlus } from 'react-icons/fa';
 import Sidebar from './Sidebar';
 
-const ManageUsers = () => {
-    const [users, setUsers] = useState([]);
-    const [editingUserId, setEditingUserId] = useState(null);
-    const [editedUser, setEditedUser] = useState({});
+const ManageCompanies = () => {
+    const [companies, setCompanies] = useState([]);
+    const [editingCompanyId, setEditingCompanyId] = useState(null);
+    const [editedCompany, setEditedCompany] = useState({});
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [deleteUserId, setDeleteUserId] = useState(null);
+    const [deleteCompanyId, setDeleteCompanyId] = useState(null);
     const [deleteReason, setDeleteReason] = useState('');
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [userRole, setUserRole] = useState('');
@@ -48,7 +48,7 @@ const ManageUsers = () => {
         };
     }, [isSidebarOpen]);
 
-    // Fetch users and current user's role
+    // Fetch companies and current user's role
     useEffect(() => {
         const fetchData = async () => {
             setIsLoading(true);
@@ -59,14 +59,14 @@ const ManageUsers = () => {
                     navigate('/login');
                     return;
                 }
-                // Fetch users with company details
-                const usersResponse = await axios.get(
-                    `${process.env.REACT_APP_BACKEND_BASEURL}/auth/users-with-company`,
+                // Fetch companies
+                const companiesResponse = await axios.get(
+                    `${process.env.REACT_APP_BACKEND_BASEURL}/auth/companies`,
                     {
                         headers: { Authorization: `Bearer ${token}` },
                     }
                 );
-                setUsers(usersResponse.data);
+                setCompanies(companiesResponse.data);
 
                 // Fetch current user's role
                 const userResponse = await axios.get(
@@ -86,39 +86,39 @@ const ManageUsers = () => {
         fetchData();
     }, [navigate]);
 
-    const handleEdit = useCallback((user) => {
-        setEditingUserId(user._id);
-        setEditedUser(user);
+    const handleEdit = useCallback((company) => {
+        setEditingCompanyId(company._id);
+        setEditedCompany(company);
     }, []);
 
     const handleSave = useCallback(async () => {
         try {
             const token = localStorage.getItem('token');
             await axios.put(
-                `${process.env.REACT_APP_BACKEND_BASEURL}/auth/users/${editingUserId}`,
-                editedUser,
+                `${process.env.REACT_APP_BACKEND_BASEURL}/auth/companies/${editingCompanyId}`,
+                editedCompany,
                 {
                     headers: { Authorization: `Bearer ${token}` },
                 }
             );
-            setEditingUserId(null);
-            setUsers((prevUsers) =>
-                prevUsers.map((user) =>
-                    user._id === editingUserId ? { ...user, ...editedUser } : user
+            setEditingCompanyId(null);
+            setCompanies((prevCompanies) =>
+                prevCompanies.map((company) =>
+                    company._id === editingCompanyId ? { ...company, ...editedCompany } : company
                 )
             );
-            setSuccess('User updated successfully!');
+            setSuccess('Company updated successfully!');
             setError('');
         } catch (error) {
             const errorMessage =
-                error.response?.data?.message || 'Failed to update user. Please try again.';
+                error.response?.data?.message || 'Failed to update company. Please try again.';
             setError(errorMessage);
-            console.error('Error updating user:', error);
+            console.error('Error updating company:', error);
         }
-    }, [editingUserId, editedUser]);
+    }, [editingCompanyId, editedCompany]);
 
-    const handleDelete = useCallback((userId) => {
-        setDeleteUserId(userId);
+    const handleDelete = useCallback((companyId) => {
+        setDeleteCompanyId(companyId);
         setIsDeleteModalOpen(true);
     }, []);
 
@@ -134,26 +134,28 @@ const ManageUsers = () => {
 
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.delete(
-                `${process.env.REACT_APP_BACKEND_BASEURL}/auth/users/${deleteUserId}`,
+            await axios.delete(
+                `${process.env.REACT_APP_BACKEND_BASEURL}/auth/companies/${deleteCompanyId}`,
                 {
                     headers: { Authorization: `Bearer ${token}` },
                     data: { reason: deleteReason.trim() },
                 }
             );
-            setUsers((prevUsers) => prevUsers.filter((user) => user._id !== deleteUserId));
+            setCompanies((prevCompanies) =>
+                prevCompanies.filter((company) => company._id !== deleteCompanyId)
+            );
             setIsDeleteModalOpen(false);
             setDeleteReason('');
-            setDeleteUserId(null);
+            setDeleteCompanyId(null);
             setError('');
-            setSuccess(response.data.warning || 'User deleted successfully!');
+            setSuccess('Company deactivated successfully!');
         } catch (error) {
             const errorMessage =
-                error.response?.data?.message || 'Failed to delete user. Please try again.';
+                error.response?.data?.message || 'Failed to deactivate company. Please try again.';
             setError(errorMessage);
-            console.error('Error deleting user:', error);
+            console.error('Error deactivating company:', error);
         }
-    }, [deleteUserId, deleteReason]);
+    }, [deleteCompanyId, deleteReason]);
 
     return (
         <div className="flex min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-blue-900 text-white overflow-hidden">
@@ -161,15 +163,15 @@ const ManageUsers = () => {
             {isDeleteModalOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-gray-800 bg-opacity-70 backdrop-blur-md p-6 rounded-xl shadow-lg max-w-lg w-full">
-                        <h2 className="text-xl font-semibold text-gray-200 mb-4">Delete User</h2>
+                        <h2 className="text-xl font-semibold text-gray-200 mb-4">Deactivate Company</h2>
                         <label className="block text-gray-200 font-medium mb-2">
-                            Reason for deletion:
+                            Reason for deactivation:
                         </label>
                         <textarea
                             value={deleteReason}
                             onChange={(e) => setDeleteReason(e.target.value)}
                             maxLength={500}
-                            placeholder="Enter reason for deletion"
+                            placeholder="Enter reason for deactivation"
                             className="w-full p-3 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
                             rows="4"
                         />
@@ -189,7 +191,7 @@ const ManageUsers = () => {
                                 onClick={handleDeleteSubmit}
                                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-300"
                             >
-                                Confirm Delete
+                                Confirm Deactivation
                             </button>
                         </div>
                     </div>
@@ -214,22 +216,22 @@ const ManageUsers = () => {
                     <div className="mb-8">
                         <div className="flex justify-between items-center">
                             <h1 className="text-2xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 animate-pulse">
-                                Manage Users
+                                Manage Companies
                             </h1>
-                            <button
-                                onClick={() => navigate('/register')}
+                            <Link
+                                to="/create-company"
                                 className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all duration-300 shadow-lg hover:scale-[1.02] flex items-center"
                             >
                                 <FaPlus className="mr-2 w-4 h-4" />
-                                Create User
-                            </button>
+                                Create Company
+                            </Link>
                         </div>
                         <nav className="text-gray-300 text-sm mt-2">
                             <Link to="/dashboard" className="hover:underline hover:text-purple-300">
                                 Dashboard
                             </Link>
                             {' / '}
-                            <span className="text-purple-300">Manage Users</span>
+                            <span className="text-purple-300">Manage Companies</span>
                         </nav>
                     </div>
 
@@ -252,162 +254,87 @@ const ManageUsers = () => {
                         </div>
                     )}
 
-                    {/* Users Table */}
+                    {/* Companies Table */}
                     <div className="overflow-x-auto bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl shadow-lg">
-                        {users.length === 0 && !isLoading ? (
-                            <p className="text-gray-300 p-6 text-center">No users available.</p>
+                        {companies.length === 0 && !isLoading ? (
+                            <p className="text-gray-300 p-6 text-center">No companies available.</p>
                         ) : (
                             <table className="w-full text-sm sm:text-base text-left text-gray-200">
                                 <thead className="bg-gray-900 bg-opacity-50">
                                     <tr>
-                                        <th className="px-4 py-3 sm:px-6">UID</th>
-                                        <th className="px-4 py-3 sm:px-6">Email</th>
-                                        <th className="px-4 py-3 sm:px-6">First Name</th>
-                                        <th className="px-4 py-3 sm:px-6">Last Name</th>
-                                        <th className="px-4 py-3 sm:px-6">Designation</th>
-                                        <th className="px-4 py-3 sm:px-6">Role</th>
-                                        <th className="px-4 py-3 sm:px-6">Phone</th>
-                                        <th className="px-4 py-3 sm:px-6">Location</th>
-                                        <th className="px-4 py-3 sm:px-6">Company</th>
-                                        <th className="px-4 py-3 sm:px-6">Avatar</th>
+                                        <th className="px-4 py-3 sm:px-6">Company ID</th>
+                                        <th className="px-4 py-3 sm:px-6">Name</th>
+                                        <th className="px-4 py-3 sm:px-6">Address</th>
+                                        <th className="px-4 py-3 sm:px-6">Phone Number</th>
+                                        <th className="px-4 py-3 sm:px-6">Status</th>
                                         <th className="px-4 py-3 sm:px-6">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {users.map((user) => (
+                                    {companies.map((company) => (
                                         <tr
-                                            key={user._id}
+                                            key={company._id}
                                             className="hover:bg-gray-700 hover:bg-opacity-50 border-t border-purple-600 border-opacity-30 transition-all duration-300"
                                         >
                                             <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[150px]">
-                                                {user.uid}
+                                                {company.companyId}
                                             </td>
                                             <td className="px-4 py-4 sm:px-6 truncate max-w-[150px] sm:max-w-[200px]">
-                                                {user.email}
-                                            </td>
-                                            <td className="px-4 py-4 sm:px-6">
-                                                {editingUserId === user._id ? (
+                                                {editingCompanyId === company._id ? (
                                                     <input
                                                         type="text"
-                                                        value={editedUser.firstName || ''}
+                                                        value={editedCompany.name || ''}
                                                         onChange={(e) =>
-                                                            setEditedUser({
-                                                                ...editedUser,
-                                                                firstName: e.target.value,
+                                                            setEditedCompany({
+                                                                ...editedCompany,
+                                                                name: e.target.value,
                                                             })
                                                         }
                                                         className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
                                                     />
                                                 ) : (
-                                                    user.firstName
+                                                    company.name
                                                 )}
                                             </td>
-                                            <td className="px-4 py-4 sm:px-6">
-                                                {editingUserId === user._id ? (
+                                            <td className="px-4 py-4 sm:px-6 truncate max-w-[200px] sm:max-w-[250px]">
+                                                {editingCompanyId === company._id ? (
                                                     <input
                                                         type="text"
-                                                        value={editedUser.lastName || ''}
+                                                        value={editedCompany.address || ''}
                                                         onChange={(e) =>
-                                                            setEditedUser({
-                                                                ...editedUser,
-                                                                lastName: e.target.value,
+                                                            setEditedCompany({
+                                                                ...editedCompany,
+                                                                address: e.target.value,
                                                             })
                                                         }
                                                         className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
                                                     />
                                                 ) : (
-                                                    user.lastName
+                                                    company.address || 'N/A'
                                                 )}
                                             </td>
                                             <td className="px-4 py-4 sm:px-6">
-                                                {editingUserId === user._id ? (
-                                                    <input
-                                                        type="text"
-                                                        value={editedUser.designation || ''}
-                                                        onChange={(e) =>
-                                                            setEditedUser({
-                                                                ...editedUser,
-                                                                designation: e.target.value,
-                                                            })
-                                                        }
-                                                        className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                                    />
-                                                ) : (
-                                                    user.designation || 'N/A'
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-4 sm:px-6">
-                                                {editingUserId === user._id ? (
-                                                    <select
-                                                        value={editedUser.role || ''}
-                                                        onChange={(e) =>
-                                                            setEditedUser({
-                                                                ...editedUser,
-                                                                role: e.target.value,
-                                                            })
-                                                        }
-                                                        className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                                    >
-                                                        <option value="customer" className="bg-gray-900">Customer</option>
-                                                        <option value="support_engineer" className="bg-gray-900">
-                                                            Support Engineer
-                                                        </option>
-                                                        <option value="admin" className="bg-gray-900">Admin</option>
-                                                    </select>
-                                                ) : (
-                                                    user.role
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-4 sm:px-6">
-                                                {editingUserId === user._id ? (
+                                                {editingCompanyId === company._id ? (
                                                     <input
                                                         type="tel"
-                                                        value={editedUser.phoneNumber || ''}
+                                                        value={editedCompany.phoneNumber || ''}
                                                         onChange={(e) =>
-                                                            setEditedUser({
-                                                                ...editedUser,
+                                                            setEditedCompany({
+                                                                ...editedCompany,
                                                                 phoneNumber: e.target.value,
                                                             })
                                                         }
                                                         className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
                                                     />
                                                 ) : (
-                                                    user.phoneNumber || 'N/A'
+                                                    company.phoneNumber || 'N/A'
                                                 )}
                                             </td>
                                             <td className="px-4 py-4 sm:px-6">
-                                                {editingUserId === user._id ? (
-                                                    <input
-                                                        type="text"
-                                                        value={editedUser.location || ''}
-                                                        onChange={(e) =>
-                                                            setEditedUser({
-                                                                ...editedUser,
-                                                                location: e.target.value,
-                                                            })
-                                                        }
-                                                        className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                                    />
-                                                ) : (
-                                                    user.location || 'N/A'
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[150px]">
-                                                {user.companyName || 'No Company'}
-                                            </td>
-                                            <td className="px-4 py-4 sm:px-6">
-                                                {user.avatar ? (
-                                                    <img
-                                                        src={user.avatar}
-                                                        alt="Avatar"
-                                                        className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover"
-                                                    />
-                                                ) : (
-                                                    <span className="text-gray-400">No Avatar</span>
-                                                )}
+                                                {company.status}
                                             </td>
                                             <td className="px-4 py-4 sm:px-6 flex gap-2 flex-wrap">
-                                                {editingUserId === user._id ? (
+                                                {editingCompanyId === company._id ? (
                                                     <button
                                                         className="px-3 py-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-300"
                                                         onClick={handleSave}
@@ -415,17 +342,19 @@ const ManageUsers = () => {
                                                         Save
                                                     </button>
                                                 ) : (
-                                                    <button
-                                                        className="px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-300"
-                                                        onClick={() => handleEdit(user)}
-                                                    >
-                                                        Edit
-                                                    </button>
+                                                    userRole === 'admin' && (
+                                                        <button
+                                                            className="px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-300"
+                                                            onClick={() => handleEdit(company)}
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                    )
                                                 )}
                                                 {userRole === 'admin' && (
                                                     <button
                                                         className="px-3 py-1 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-lg hover:from-red-700 hover:to-pink-700 transition-all duration-300"
-                                                        onClick={() => handleDelete(user._id)}
+                                                        onClick={() => handleDelete(company._id)}
                                                     >
                                                         Delete
                                                     </button>
@@ -467,4 +396,4 @@ const ManageUsers = () => {
     );
 };
 
-export default React.memo(ManageUsers);
+export default React.memo(ManageCompanies);

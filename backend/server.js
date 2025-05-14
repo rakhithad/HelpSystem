@@ -28,4 +28,3 @@ app.use('/api/tickets', ticketRoutes);
 
 const notificationRoutes = require('./routes/notificationRoutes');
 app.use('/api/notifications', notificationRoutes);
-

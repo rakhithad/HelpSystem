@@ -6,7 +6,6 @@ import CreateTicket from './components/CreateTicket';
 import Dashboard from './components/Dashboard';
 import ViewTickets from './components/ViewTickets';
 import Sidebar from './components/Sidebar';
-import AdminDashboard from './components/AdminDashboard';
 import ManageUsers from './components/ManageUsers';
 import Account from './components/Account';
 import CreateCompany from './components/CreateCompany';
@@ -16,27 +15,25 @@ import ManageTickets from './components/ManageTickets';
 import HomePage from './components/HomePage';
 import ViewReviewsPage from './components/ViewReviewsPage';
 import NotificationPage from './components/NotificationPage';
+import ManageCompanies from './components/ManageCompanies';
 
 const App = () => {
     const isAuthenticated = () => {
-        const token = localStorage.getItem('token'); // Check for token in localStorage
-        return !!token; // Return true if token exists
+        const token = localStorage.getItem('token');
+        return !!token;
     };
 
-    const ExcludeSidebarRoutes = ["/login", "/home", "/report", "/view-reviews"]; // Routes where sidebar should not appear
+    const ExcludeSidebarRoutes = ["/login", "/home", "/report", "/view-reviews"];
 
     const MainContent = () => {
-        const location = useLocation(); // Get the current route
-
-        const showSidebar = !ExcludeSidebarRoutes.includes(location.pathname); // Determine if sidebar should be shown
+        const location = useLocation();
+        const showSidebar = !ExcludeSidebarRoutes.includes(location.pathname);
 
         return (
             <div>
-                {/* Conditionally render Sidebar */}
                 {showSidebar && <Sidebar />}
                 <div>
                     <Routes>
-                        {/* Redirect to Dashboard or Login based on authentication */}
                         <Route
                             path="/"
                             element={
@@ -53,7 +50,6 @@ const App = () => {
                         <Route path="/create-ticket" element={<CreateTicket />} />
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/view-tickets" element={<ViewTickets />} />
-                        <Route path="/admin-dashboard" element={<AdminDashboard />} />
                         <Route path="/manage-users" element={<ManageUsers />} />
                         <Route path="/account" element={<Account />} />
                         <Route path="/create-company" element={<CreateCompany />} />
@@ -62,7 +58,7 @@ const App = () => {
                         <Route path="/manage-tickets" element={<ManageTickets />} />
                         <Route path="/view-reviews" element={<ViewReviewsPage />} />
                         <Route path="/notifications" element={<NotificationPage />} />
-
+                        <Route path="/manage-companies" element={<ManageCompanies />} />
                     </Routes>
                 </div>
             </div>

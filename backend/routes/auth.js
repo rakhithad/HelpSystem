@@ -21,15 +21,22 @@ router.post('/register', async (req, res) => {
         const existingUser = await User.findOne({ email });
         if (existingUser) return res.status(400).json({ message: 'email already taken' });
 
-        // Validate companyId for customers
+        // Validate or assign companyId
+        let finalCompanyId = companyId;
         if (role === 'customer') {
+            if (!companyId) {
+                return res.status(400).json({ message: 'Company ID is required for customers' });
+            }
             const company = await Company.findOne({ companyId });
             if (!company) {
                 return res.status(400).json({ message: 'Invalid companyId. Please create a company first.' });
             }
+        } else if (role === 'admin' || role === 'support_engineer') {
+            // Assign default companyId for admins and support engineers if not provided
+            finalCompanyId = companyId || 'COMP-3';
         }
 
-        console.log('Received companyId:', companyId);
+        console.log('Assigned companyId:', finalCompanyId);
 
         // Hash the password
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -42,7 +49,7 @@ router.post('/register', async (req, res) => {
         );
 
         if (!counter || !counter.count) {
-            throw new Error("Counter not found or failed to increment");
+            throw new Error('Counter not found or failed to increment');
         }
         const uid = `UID-${counter.count}`;
 
@@ -57,8 +64,8 @@ router.post('/register', async (req, res) => {
             designation,
             phoneNumber,
             location,
-            companyId,
-            avatar
+            companyId: finalCompanyId,
+            avatar,
         });
 
         await newUser.save();
@@ -67,12 +74,12 @@ router.post('/register', async (req, res) => {
         const token = jwt.sign(
             { id: newUser._id, email: newUser.email, uid: newUser.uid, role: newUser.role },
             process.env.JWT_SECRET,
-            { expiresIn: '1h' } 
+            { expiresIn: '1h' }
         );
 
         res.status(201).json({ message: 'User registered successfully', token });
     } catch (error) {
-        console.error(error);
+        console.error('Error registering user:', error);
         res.status(500).json({ message: 'Error registering user' });
     }
 });
@@ -165,13 +172,13 @@ router.get('/users', authenticateToken, async (req, res) => {
         if (req.user.role !== 'admin') {
             return res.status(403).json({ message: 'Access denied' });
         }
-        const users = await User.find({}, '-password'); // Exclude passwords
+        const users = await User.find({ userStatus: { $ne: 'inactive' } }, '-password'); // Exclude inactive users and passwords
         res.status(200).json(users);
     } catch (error) {
+        console.error('Error fetching users:', error);
         res.status(500).json({ message: 'Failed to fetch users' });
     }
 });
-
 
 
 router.delete('/users/:id', authenticateToken, async (req, res) => {
@@ -355,11 +362,139 @@ router.post('/create-company', async (req, res) => {
 
 router.get('/companies', async (req, res) => {
     try {
-        const companies = await Company.find();
+        const companies = await Company.find({ status: 'active' });
         res.status(200).json(companies);
     } catch (error) {
-        console.error('Error fetching companies:', error);
+        console.error('Error fetching companies:', {
+            error: error.message,
+        });
         res.status(500).json({ message: 'Error fetching companies' });
+    }
+});
+
+router.put('/companies/:id', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        const { name, address, phoneNumber } = req.body;
+        if (!name || !address || !phoneNumber) {
+            return res.status(400).json({ message: 'Name, address, and phone number are required' });
+        }
+
+        const company = await Company.findByIdAndUpdate(
+            req.params.id,
+            { name, address, phoneNumber },
+            { new: true, runValidators: true }
+        );
+
+        if (!company) {
+            return res.status(404).json({ message: 'Company not found' });
+        }
+
+        res.status(200).json(company);
+    } catch (error) {
+        console.error('Error updating company:', {
+            error: error.message,
+            userId: req.user?.id,
+            role: req.user?.role,
+        });
+        res.status(500).json({ message: 'Failed to update company' });
+    }
+});
+
+router.delete('/companies/:id', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        const { reason } = req.body;
+        if (!reason || reason.trim().length === 0) {
+            return res.status(400).json({ message: 'Reason is required' });
+        }
+        if (reason.length > 500) {
+            return res.status(400).json({ message: 'Reason must not exceed 500 characters' });
+        }
+
+        const company = await Company.findById(req.params.id);
+        if (!company) {
+            return res.status(404).json({ message: 'Company not found' });
+        }
+        if (company.status === 'inactive') {
+            return res.status(400).json({ message: 'Company is already inactive' });
+        }
+
+        company.status = 'inactive';
+        await company.save();
+
+        // Log deletion reason (in a real app, save to a logs collection)
+        console.log('Company deactivated:', {
+            companyId: company.companyId,
+            name: company.name,
+            reason: reason.trim(),
+            timestamp: new Date().toISOString(),
+            userId: req.user.id,
+        });
+
+        res.status(200).json({ message: 'Company deactivated successfully' });
+    } catch (error) {
+        console.error('Error deactivating company:', {
+            error: error.message,
+            userId: req.user?.id,
+            role: req.user?.role,
+        });
+        res.status(500).json({ message: 'Failed to deactivate company' });
+    }
+});
+
+
+router.get('/users-with-company', authenticateToken, async (req, res) => {
+    try {
+        // Ensure only admins can fetch users
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        // Fetch users with company details, excluding inactive users
+        const users = await User.aggregate([
+            { $match: { userStatus: { $ne: 'inactive' } } },
+            {
+                $lookup: {
+                    from: 'companies',
+                    localField: 'companyId',
+                    foreignField: 'companyId',
+                    as: 'company',
+                },
+            },
+            { $unwind: { path: '$company', preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    _id: 1,
+                    uid: 1,
+                    email: 1,
+                    firstName: 1,
+                    lastName: 1,
+                    role: 1,
+                    phoneNumber: 1,
+                    location: 1,
+                    designation: 1,
+                    avatar: 1,
+                    companyId: 1,
+                    companyName: '$company.name',
+                },
+            },
+        ]);
+
+        res.status(200).json(users);
+    } catch (error) {
+        console.error('Error fetching users with company:', {
+            error: error.message,
+            userId: req.user?.id,
+            role: req.user?.role,
+        });
+        res.status(500).json({ message: 'Failed to fetch users' });
     }
 });
 

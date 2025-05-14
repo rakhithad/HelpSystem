@@ -60,6 +60,13 @@ const AdminDashboard = () => {
                         >
                             Report
                         </button>
+
+                        <button
+                            className="w-full px-6 py-4 bg-white bg-opacity-10 backdrop-blur-md text-white text-lg font-semibold rounded-2xl shadow-2xl hover:bg-opacity-20 transition-all duration-300"
+                            onClick={() => navigate('/Manage-companies')}
+                        >
+                            mngCompoanies
+                        </button>
                     </div>
                 </div>
             </div>
