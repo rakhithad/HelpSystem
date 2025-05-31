@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { FaTimes, FaBell, FaTicketAlt, FaTachometerAlt, FaUsers, FaBuilding, FaFileAlt, FaStar, FaUser, FaSignOutAlt } from 'react-icons/fa';
+import { FaTimes, FaBell, FaTicketAlt, FaTachometerAlt, FaUsers, FaBuilding, FaFileAlt, FaStar, FaSignOutAlt } from 'react-icons/fa';
 
 const Sidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
     const navigate = useNavigate();
