@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { FaSpinner, FaBars, FaHome, FaUser, FaPlus } from 'react-icons/fa';
 import Sidebar from './Sidebar';
 
@@ -19,6 +19,7 @@ const ManageTickets = () => {
     const [deleteReason, setDeleteReason] = useState('');
     const [editingTicketId, setEditingTicketId] = useState(null);
     const navigate = useNavigate();
+    const location = useLocation(); // Access navigation state
 
     const token = localStorage.getItem('token');
     const userUid = localStorage.getItem('uid');
@@ -29,6 +30,29 @@ const ManageTickets = () => {
             navigate('/login');
         }
     }, [token, navigate]);
+
+    // Handle updated ticket from ReviewTicketPage
+    useEffect(() => {
+        if (location.state?.updatedTicket) {
+            const updatedTicket = location.state.updatedTicket;
+            setTickets((prevTickets) =>
+                prevTickets.map((ticket) =>
+                    ticket._id === updatedTicket._id
+                        ? { ...ticket, ...updatedTicket, reviewed: true }
+                        : ticket
+                )
+            );
+            setFilteredTickets((prevFiltered) =>
+                prevFiltered.map((ticket) =>
+                    ticket._id === updatedTicket._id
+                        ? { ...ticket, ...updatedTicket, reviewed: true }
+                        : ticket
+                )
+            );
+            // Clear the location state to prevent reprocessing
+            navigate('/view-tickets', { replace: true, state: {} });
+        }
+    }, [location.state, navigate]);
 
     // Close sidebar when clicking outside on mobile
     useEffect(() => {
@@ -466,6 +490,23 @@ const ManageTickets = () => {
                                                     >
                                                         Delete
                                                     </button>
+                                                )}
+                                                {userRole === 'customer' && ticket.status === 'done' && (
+                                                    ticket.reviewed ? (
+                                                        <button
+                                                            className="px-3 py-1 bg-gray-600 text-white rounded-lg transition-all duration-300 opacity-70 cursor-not-allowed"
+                                                            disabled
+                                                        >
+                                                            Review Submitted
+                                                        </button>
+                                                    ) : (
+                                                        <Link
+                                                            to={`/review-ticket/${ticket._id}`}
+                                                            className="px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all duration-300"
+                                                        >
+                                                            Review
+                                                        </Link>
+                                                    )
                                                 )}
                                             </td>
                                         </tr>

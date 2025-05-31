@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { FaTimes, FaBell, FaTicketAlt, FaTachometerAlt, FaUsers, FaBuilding, FaFileAlt, FaStar, FaSignOutAlt } from 'react-icons/fa';
+import logo from '../assets/bannerlogo.png';
 
 const Sidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
     const navigate = useNavigate();
@@ -39,13 +40,13 @@ const Sidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
 
     const navItems = {
         admin: [
-            { to: '/notifications', label: 'Notifications', icon: <FaBell className="w-5 h-5 mr-3" /> },
-            { to: '/create-ticket', label: 'Create Ticket', icon: <FaTicketAlt className="w-5 h-5 mr-3" /> },
-            { to: '/dashboard', label: 'Dashboard', icon: <FaTachometerAlt className="w-5 h-5 mr-3" /> },
-            { to: '/manage-tickets', label: 'Manage Tickets', icon: <FaTicketAlt className="w-5 h-5 mr-3" /> },
-            { to: '/manage-users', label: 'Manage Users', icon: <FaUsers className="w-5 h-5 mr-3" /> },
-            { to: '/manage-companies', label: 'Manage Companies', icon: <FaBuilding className="w-5 h-5 mr-3" /> },
-            { to: '/report', label: 'Report', icon: <FaFileAlt className="w-5 h-5 mr-3" /> },
+            { to: '/notifications', label: 'Notifications', icon: <FaBell className="w-4 h-4 mr-3" /> },
+            { to: '/create-ticket', label: 'Create Ticket', icon: <FaTicketAlt className="w-4 h-4 mr-3" /> },
+            { to: '/dashboard', label: 'Dashboard', icon: <FaTachometerAlt className="w-4 h-4 mr-3" /> },
+            { to: '/manage-tickets', label: 'Manage Tickets', icon: <FaTicketAlt className="w-4 h-45 mr-3" /> },
+            { to: '/manage-users', label: 'Manage Users', icon: <FaUsers className="w-4 h-4 mr-3" /> },
+            { to: '/manage-companies', label: 'Manage Companies', icon: <FaBuilding className="w-4 h-4 mr-3" /> },
+            { to: '/report', label: 'Report', icon: <FaFileAlt className="w-4 h-4 mr-3" /> },
         ],
         support_engineer: [
             { to: '/notifications', label: 'Notifications', icon: <FaBell className="w-5 h-5 mr-3" /> },
@@ -62,7 +63,7 @@ const Sidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
     };
 
     return (
-        <div className={`sidebar-container h-screen w-72 fixed left-0 top-0 bg-gray-900 bg-opacity-90 backdrop-blur-2xl border-r border-purple-600 border-opacity-30 shadow-xl z-40 transform transition-transform duration-500 ease-in-out ${
+        <div className={`sidebar-container fixed left-0 top-0 w-72 h-screen bg-gray-900 bg-opacity-90 backdrop-blur-2xl border-r border-purple-600 border-opacity-30 shadow-xl z-40 transform transition-transform duration-500 ease-in-out overflow-y-auto ${
             isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:translate-x-0`}>
             {/* Close button for mobile */}
@@ -73,12 +74,12 @@ const Sidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
                 <FaTimes className="w-6 h-6" />
             </button>
 
-            <div className="py-10 px-6">
-                <h1 className="text-3xl font-extrabold bg-gradient-to-r from-purple-400 via-pink-400 to-red-400 bg-clip-text text-transparent animate-pulse">
+            <div className="px-6 ml-6 mt-6 mb-5">
+                <h1 className="text-xl font-extrabold bg-gradient-to-r from-purple-400 via-pink-400 to-red-400 bg-clip-text text-transparent animate-pulse">
                     HelpDesk System
                 </h1>
             </div>
-
+            
             {isLoading && (
                 <div className="flex justify-center items-center mt-6">
                     <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-purple-500"></div>
@@ -91,64 +92,64 @@ const Sidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
                 </div>
             )}
 
-            <nav className="mt-8 flex-1">
-                <ul className="space-y-2 px-4">
-                    {(navItems[user?.role] || []).map((item) => (
-                        <li key={item.to}>
+            <div className="flex flex-col flex-1 min-h-0">
+                <nav className="flex-1 px-4 mt-5">
+                    <ul className="space-y-2">
+                        {(navItems[user?.role] || []).map((item) => (
+                            <li key={item.to}>
+                                <Link
+                                    to={item.to}
+                                    className={linkClasses}
+                                    onClick={() => window.innerWidth < 1024 && setIsSidebarOpen(false)}
+                                >
+                                    {item.icon}
+                                    <span className="font-medium">{item.label}</span>
+                                </Link>
+                            </li>
+                        ))}
+                        
+                        <li>
                             <Link
-                                to={item.to}
+                                to="/view-reviews"
                                 className={linkClasses}
                                 onClick={() => window.innerWidth < 1024 && setIsSidebarOpen(false)}
                             >
-                                {item.icon}
-                                <span className="font-medium">{item.label}</span>
+                                <FaStar className="w-5 h-5 mr-3" />
+                                <span className="font-medium">Reviews</span>
                             </Link>
                         </li>
-                    ))}
-                    <li>
-                        <hr className="my-4 border-t border-purple-600 border-opacity-50" />
-                    </li>
-                    <li>
-                        <Link
-                            to="/view-reviews"
-                            className={linkClasses}
-                            onClick={() => window.innerWidth < 1024 && setIsSidebarOpen(false)}
-                        >
-                            <FaStar className="w-5 h-5 mr-3" />
-                            <span className="font-medium">Reviews</span>
-                        </Link>
-                    </li>
-                </ul>
-            </nav>
+                    </ul>
+                </nav>
 
-            <div className="absolute bottom-0 left-0 right-0 p-6 space-y-4 bg-gray-900 bg-opacity-95 backdrop-blur-md border-t border-purple-600 border-opacity-30">
-                {user && (
+                <div className="p-6 space-y-4 bg-gray-900 bg-opacity-95 backdrop-blur-md border-t border-purple-600 border-opacity-30">
+                    {user && (
+                        <button
+                            onClick={() => {
+                                navigate('/account');
+                                window.innerWidth < 1024 && setIsSidebarOpen(false);
+                            }}
+                            className="flex items-center w-full px-4 py-1 text-gray-200 bg-gradient-to-r from-purple-500 to-pink-500 bg-opacity-20 hover:bg-opacity-30 rounded-xl transition-all duration-300 transform hover:scale-105"
+                        >
+                            <img
+                                src={user.avatar || 'https://i.pinimg.com/474x/03/73/c1/0373c1f0dec9b5ad0e1872494c341984.jpg'}
+                                alt="Avatar"
+                                className="w-10 h-10 rounded-full mr-3 border-2 border-purple-500"
+                            />
+                            <span className="font-medium truncate">{user.email}</span>
+                        </button>
+                    )}
+
                     <button
                         onClick={() => {
-                            navigate('/account');
+                            handleLogout();
                             window.innerWidth < 1024 && setIsSidebarOpen(false);
                         }}
-                        className="flex items-center w-full px-4 py-3 text-gray-200 bg-gradient-to-r from-purple-500 to-pink-500 bg-opacity-20 hover:bg-opacity-30 rounded-xl transition-all duration-300 transform hover:scale-105"
+                        className="flex items-center w-full px-4 py-3 bg-gradient-to-r from-red-600 to-pink-600 bg-opacity-30 hover:bg-opacity-50 text-red-300 hover:text-white rounded-xl transition-all duration-300 transform hover:scale-105"
                     >
-                        <img
-                            src={user.avatar || 'https://i.pinimg.com/474x/03/73/c1/0373c1f0dec9b5ad0e1872494c341984.jpg'}
-                            alt="Avatar"
-                            className="w-10 h-10 rounded-full mr-3 border-2 border-purple-500"
-                        />
-                        <span className="font-medium truncate">{user.email}</span>
+                        <FaSignOutAlt className="w-5 h-5 mr-3" />
+                        <span className="font-medium">Logout</span>
                     </button>
-                )}
-
-                <button
-                    onClick={() => {
-                        handleLogout();
-                        window.innerWidth < 1024 && setIsSidebarOpen(false);
-                    }}
-                    className="flex items-center w-full px-4 py-3 bg-gradient-to-r from-red-600 to-pink-600 bg-opacity-30 hover:bg-opacity-50 text-red-300 hover:text-white rounded-xl transition-all duration-300 transform hover:scale-105"
-                >
-                    <FaSignOutAlt className="w-5 h-5 mr-3" />
-                    <span className="font-medium">Logout</span>
-                </button>
+                </div>
             </div>
         </div>
     );
