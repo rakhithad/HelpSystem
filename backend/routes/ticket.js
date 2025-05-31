@@ -294,23 +294,61 @@ router.delete('/delete-ticket/:id', authenticateToken, async (req, res) => {
     }
   });
 
-router.get('/ticket-counts', async (req, res) => {
-    const { role, uid } = req.headers;
-
+router.get('/ticket-counts', authenticateToken, async (req, res) => {
     try {
-        let query = {};
+        const { role, uid } = req.user;
+        
+        let baseQuery = {};
+        
+        // Apply role-based filtering for assigned tickets
         if (role === 'customer') {
-            query = { uid: uid };
-        } else if (role === 'support-engineer') {
-            query = { assignedSupportEngineer: uid };
+            baseQuery = { uid: uid };
+        } else if (role === 'support_engineer') {
+            baseQuery = { assignedSupportEngineer: uid };
         }
+        // Admin sees all tickets (no filter applied)
 
-        const openTickets = await Ticket.countDocuments({ ...query, status: 'not started' });
-        const pendingTickets = await Ticket.countDocuments({ ...query, status: 'in progress' });
-        const solvedTickets = await Ticket.countDocuments({ ...query, status: 'done' });
-        const unassignedTickets = await Ticket.countDocuments({ ...query, assignedSupportEngineer: 'Not Assigned' });
+        // Count tickets by status with role-based filtering
+        const openTickets = await Ticket.countDocuments({ 
+            ...baseQuery, 
+            status: 'not started' 
+        });
+        
+        const pendingTickets = await Ticket.countDocuments({ 
+            ...baseQuery, 
+            status: 'in progress' 
+        });
+        
+        const solvedTickets = await Ticket.countDocuments({ 
+            ...baseQuery, 
+            status: 'done' 
+        });
+        
+        // Unassigned tickets logic - NO role-based filtering for customers/support engineers
+        let unassignedQuery = {
+            $or: [
+                { assignedSupportEngineer: null },
+                { assignedSupportEngineer: 'Not Assigned' },
+                { assignedSupportEngineer: '' },
+                { assignedSupportEngineer: { $exists: false } }
+            ]
+        };
+        
+        // Only customers should see their own unassigned tickets
+        // Support engineers and admins should see ALL unassigned tickets
+        if (role === 'customer') {
+            unassignedQuery.uid = uid;
+        }
+        
+        const unassignedTickets = await Ticket.countDocuments(unassignedQuery);
 
-        res.status(200).json({ openTickets, pendingTickets, solvedTickets, unassignedTickets });
+        res.status(200).json({ 
+            openTickets, 
+            pendingTickets, 
+            solvedTickets, 
+            unassignedTickets 
+        });
+        
     } catch (error) {
         console.error('Error fetching ticket counts:', error);
         res.status(500).json({ message: 'Failed to fetch ticket counts' });
@@ -520,22 +558,43 @@ router.get('/tickets-by-status-with-company', authenticateToken, async (req, res
         const { type } = req.query;
         const { role, uid } = req.user;
 
-        // Define status mapping based on type
         let query = {};
-        if (type === 'open') query.status = 'not started';
-        else if (type === 'pending') query.status = 'in progress';
-        else if (type === 'solved') query.status = 'done';
-        else if (type === 'unassigned') query.assignedSupportEngineer = null;
-        else {
+        
+        // Define status/type mapping
+        if (type === 'open') {
+            query.status = 'not started';
+        } else if (type === 'pending') {
+            query.status = 'in progress';
+        } else if (type === 'solved') {
+            query.status = 'done';
+        } else if (type === 'unassigned') {
+            query.$or = [
+                { assignedSupportEngineer: null },
+                { assignedSupportEngineer: 'Not Assigned' },
+                { assignedSupportEngineer: '' },
+                { assignedSupportEngineer: { $exists: false } }
+            ];
+        } else {
             return res.status(400).json({ message: 'Invalid ticket type' });
         }
 
-        
+        // Apply role-based filtering
         if (role === 'customer') {
+            // Customers see only their own tickets for all types
             query.uid = uid;
         } else if (role === 'support_engineer') {
-            query.assignedSupportEngineer = uid;
+            if (type === 'unassigned') {
+                // Support engineers see ALL unassigned tickets (no additional filter)
+                // The unassigned query is already applied above
+            } else {
+                // For assigned tickets, support engineers see only tickets assigned to them
+                query.assignedSupportEngineer = uid;
+            }
         }
+        // Admin sees all tickets (no additional filtering)
+
+        console.log('Final query for tickets:', JSON.stringify(query, null, 2));
+        console.log('User role:', role, 'User ID:', uid, 'Type:', type);
 
         // Fetch tickets with user and company details
         const tickets = await Ticket.aggregate([
@@ -548,7 +607,7 @@ router.get('/tickets-by-status-with-company', authenticateToken, async (req, res
                     as: 'user',
                 },
             },
-            { $unwind: '$user' },
+            { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
             {
                 $lookup: {
                     from: 'companies',
@@ -563,20 +622,29 @@ router.get('/tickets-by-status-with-company', authenticateToken, async (req, res
                     tid: 1,
                     title: 1,
                     priority: 1,
+                    status: 1,
                     assignedSupportEngineer: 1,
                     createdAt: 1,
+                    uid: 1,
                     companyName: '$company.name',
+                    customerName: '$user.name',
+                    customerEmail: '$user.email'
                 },
             },
+            { $sort: { createdAt: -1 } }
         ]);
 
+        console.log(`Found ${tickets.length} tickets for type: ${type}`);
+        
         res.status(200).json(tickets);
+        
     } catch (error) {
         console.error('Error fetching tickets with company:', {
             error: error.message,
-            userId: req.user?.id,
+            userId: req.user?.uid,
             role: req.user?.role,
             query: req.query,
+            stack: error.stack
         });
         res.status(500).json({ message: 'Failed to fetch tickets' });
     }
