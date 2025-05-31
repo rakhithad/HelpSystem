@@ -427,6 +427,7 @@ router.get('/report', authenticateToken, async (req, res) => {
                     priority: 1,
                     createdAt: 1,
                     updatedAt: 1,
+                    resolvedAt: 1,
                     customer: {
                         uid: '$userDetails.uid',
                         name: { $concat: ['$userDetails.firstName', ' ', '$userDetails.lastName'] },
@@ -449,12 +450,14 @@ router.get('/report', authenticateToken, async (req, res) => {
         // Calculate metrics
         const allTicketsCount = reportData.length;
 
-        const doneTickets = reportData.filter(ticket => ticket.status === 'done');
-        const averageTime = doneTickets.reduce((acc, ticket) => {
-            const createdAt = new Date(ticket.createdAt);
-            const updatedAt = new Date(ticket.updatedAt);
-            return acc + (updatedAt - createdAt);
-        }, 0) / (doneTickets.length || 1);
+        const closedTickets = reportData.filter(ticket => ticket.status === 'closed' && ticket.resolvedAt);
+        const averageTime = closedTickets.length
+            ? closedTickets.reduce((acc, ticket) => {
+                  const createdAt = new Date(ticket.createdAt);
+                  const resolvedAt = new Date(ticket.resolvedAt);
+                  return acc + (resolvedAt - createdAt);
+              }, 0) / (closedTickets.length * 1000 * 60 * 60) // Convert to hours
+            : 0;
 
         const ticketsByStatus = reportData.reduce((acc, ticket) => {
             acc[ticket.status] = (acc[ticket.status] || 0) + 1;
@@ -468,21 +471,24 @@ router.get('/report', authenticateToken, async (req, res) => {
         }, {});
 
         const ticketsByCustomer = reportData.reduce((acc, ticket) => {
-            const customerName = ticket.customer.name;
+            const customerName = ticket.customer?.name || 'Unknown';
             acc[customerName] = (acc[customerName] || 0) + 1;
             return acc;
         }, {});
 
         const ticketsByPriority = reportData.reduce((acc, ticket) => {
-            acc[ticket.priority] = (acc[ticket.priority] || 0) + 1;
+            const priority = ticket.priority.toString();
+            acc[priority] = (acc[priority] || 0) + 1;
             return acc;
         }, {});
 
-        const reviews = reportData.filter(ticket => ticket.review).map(ticket => ({
-            review: ticket.review,
-            rating: ticket.rating,
-            customer: ticket.customer.name
-        }));
+        const reviews = reportData
+            .filter(ticket => ticket.review || ticket.rating)
+            .map(ticket => ({
+                review: ticket.review || 'No review',
+                rating: ticket.rating || null,
+                customer: ticket.customer?.name || 'Unknown'
+            }));
 
         res.status(200).json({
             allTicketsCount,

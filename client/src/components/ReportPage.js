@@ -3,7 +3,7 @@ import axios from "axios";
 import { Link, useNavigate } from 'react-router-dom';
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
-import { FaFilter, FaFileExport, FaChartBar, FaSync, FaBars, FaHome, FaUser, FaSpinner } from 'react-icons/fa';
+import { FaFilter, FaFileExport, FaChartBar, FaSync, FaBars, FaHome, FaUser, FaSpinner, FaTimes } from 'react-icons/fa';
 import Sidebar from './Sidebar';
 
 const ReportPage = () => {
@@ -38,6 +38,8 @@ const ReportPage = () => {
     const [showStats, setShowStats] = useState(false);
     const [showFilters, setShowFilters] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [selectedTicket, setSelectedTicket] = useState(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const navigate = useNavigate();
 
     // Close sidebar when clicking outside on mobile
@@ -60,15 +62,15 @@ const ReportPage = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isSidebarOpen]);
 
-    // Disable body scroll when sidebar is open on mobile
+    // Disable body scroll when sidebar or modal is open on mobile
     useEffect(() => {
         if (window.innerWidth < 1024) {
-            document.body.style.overflow = isSidebarOpen ? 'hidden' : 'auto';
+            document.body.style.overflow = (isSidebarOpen || isModalOpen) ? 'hidden' : 'auto';
         }
         return () => {
             document.body.style.overflow = 'auto';
         };
-    }, [isSidebarOpen]);
+    }, [isSidebarOpen, isModalOpen]);
 
     // Fetch report data on component mount
     useEffect(() => {
@@ -92,7 +94,7 @@ const ReportPage = () => {
                 }
             );
             setMetrics(response.data);
-            setFilteredTickets(response.data.reportData);
+            setFilteredTickets(response.data.reportData || []);
             setSuccess("Report data loaded successfully!");
         } catch (err) {
             console.error("Error fetching report data:", err);
@@ -128,13 +130,13 @@ const ReportPage = () => {
     };
 
     const applyFilters = (filters, mainFilterType, companyId, engineerName, customDateRange = null) => {
-        let filtered = metrics.reportData;
+        let filtered = metrics.reportData || [];
         if (mainFilterType === "company" && companyId) {
             filtered = filtered.filter(ticket => ticket.company?.companyId === companyId);
         } else if (mainFilterType === "engineer" && engineerName) {
             filtered = filtered.filter(ticket => 
                 engineerName === "Not Assigned" 
-                    ? !ticket.assignedSupportEngineer || !ticket.assignedSupportEngineer.name
+                    ? !ticket.assignedSupportEngineer?.name
                     : ticket.assignedSupportEngineer?.name === engineerName
             );
         }
@@ -144,12 +146,12 @@ const ReportPage = () => {
         if (filters.engineer) {
             filtered = filtered.filter(ticket => 
                 filters.engineer === "Not Assigned"
-                    ? !ticket.assignedSupportEngineer || !ticket.assignedSupportEngineer.name
+                    ? !ticket.assignedSupportEngineer?.name
                     : ticket.assignedSupportEngineer?.name === filters.engineer
             );
         }
         if (filters.customer) {
-            filtered = filtered.filter(ticket => ticket.customer.name === filters.customer);
+            filtered = filtered.filter(ticket => ticket.customer?.name === filters.customer);
         }
         if (filters.priority) {
             filtered = filtered.filter(ticket => ticket.priority === parseInt(filters.priority));
@@ -190,19 +192,19 @@ const ReportPage = () => {
             startDate: "",
             endDate: ""
         });
-        setFilteredTickets(metrics.reportData);
+        setFilteredTickets(metrics.reportData || []);
     };
 
-    const uniqueCompanies = metrics.reportData
+    const uniqueCompanies = (metrics.reportData || [])
         .map(ticket => ticket.company)
         .filter(company => company && company.companyId)
         .filter((company, index, self) => self.findIndex(c => c.companyId === company.companyId) === index);
 
     const uniqueEngineers = [...new Set(
-        metrics.reportData.map(ticket => 
-            ticket.assignedSupportEngineer?.name || "not_assigned"
+        (metrics.reportData || []).map(ticket => 
+            ticket.assignedSupportEngineer?.name || "Not Assigned"
         )
-    )].filter(name => name !== "not_assigned");
+    )].filter(name => name !== "Not Assigned");
 
     const calculateStats = () => {
         if (!filteredTickets.length) return {};
@@ -243,7 +245,7 @@ const ReportPage = () => {
     const exportToPDF = () => {
         const doc = new jsPDF();
         doc.setFontSize(18);
-        doc.setTextColor(99, 102, 241); // Indigo-600
+        doc.setTextColor(99, 102, 241);
         doc.text("Ticket Report", doc.internal.pageSize.getWidth() / 2, 15, { align: "center" });
         doc.setFontSize(10);
         doc.setTextColor(255, 255, 255);
@@ -271,26 +273,16 @@ const ReportPage = () => {
         const columns = [
             { header: "ID", dataKey: "tid" },
             { header: "Title", dataKey: "title" },
-            { header: "Status", dataKey: "status" },
-            { header: "Priority", dataKey: "priority" },
-            { header: "Customer", dataKey: "customer" },
+            { header: "Company", dataKey: "company" },
             { header: "Engineer", dataKey: "engineer" },
-            { header: "Created", dataKey: "createdAt" },
-            { header: "Description", dataKey: "description" },
+            { header: "Created", dataKey: "createdAt" }
         ];
         const rows = filteredTickets.map(ticket => ({
             tid: ticket.tid,
             title: ticket.title,
-            status: ticket.status,
-            priority: ticket.priority,
-            customer: ticket.customer.name,
+            company: ticket.company?.name || "No Company",
             engineer: ticket.assignedSupportEngineer?.name || "Not Assigned",
-            createdAt: new Date(ticket.createdAt).toLocaleDateString(),
-            description: ticket.description 
-                ? (ticket.description.length > 60 
-                    ? ticket.description.substring(0, 60) + "..." 
-                    : ticket.description)
-                : "No description",
+            createdAt: new Date(ticket.createdAt).toLocaleDateString()
         }));
         autoTable(doc, {
             head: [columns.map(col => col.header)],
@@ -299,19 +291,26 @@ const ReportPage = () => {
             styles: { overflow: 'linebreak', fontSize: 8, textColor: [255, 255, 255], fillColor: [31, 41, 55] },
             headStyles: { fillColor: [99, 102, 241], textColor: [255, 255, 255] },
             columnStyles: {
-                tid: { cellWidth: 15 },
-                title: { cellWidth: 40 },
-                status: { cellWidth: 20 },
-                priority: { cellWidth: 15 },
-                customer: { cellWidth: 25 },
-                engineer: { cellWidth: 25 },
-                createdAt: { cellWidth: 20 },
-                description: { cellWidth: 40 }
+                tid: { cellWidth: 20 },
+                title: { cellWidth: 50 },
+                company: { cellWidth: 40 },
+                engineer: { cellWidth: 40 },
+                createdAt: { cellWidth: 30 }
             },
             theme: 'grid',
             alternateRowStyles: { fillColor: [55, 65, 81] }
         });
         doc.save("ticket_report.pdf");
+    };
+
+    const openTicketModal = (ticket) => {
+        setSelectedTicket(ticket);
+        setIsModalOpen(true);
+    };
+
+    const closeTicketModal = () => {
+        setSelectedTicket(null);
+        setIsModalOpen(false);
     };
 
     return (
@@ -421,7 +420,7 @@ const ReportPage = () => {
                                                 <div className="flex-1 bg-gray-700 h-4 rounded-full overflow-hidden">
                                                     <div 
                                                         className="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full" 
-                                                        style={{ width: `${(count / stats.total) * 100}%` }}
+                                                        style={{ width: `${stats.total ? (count / stats.total) * 100 : 0}%` }}
                                                     ></div>
                                                 </div>
                                                 <div className="w-12 text-right text-sm text-gray-300">{count}</div>
@@ -443,7 +442,7 @@ const ReportPage = () => {
                                                             priority === "3" ? "bg-gradient-to-r from-orange-500 to-red-500" : 
                                                             "bg-gradient-to-r from-red-500 to-pink-500"
                                                         }`}
-                                                        style={{ width: `${(count / stats.total) * 100}%` }}
+                                                        style={{ width: `${stats.total ? (count / stats.total) * 100 : 0}%` }}
                                                     ></div>
                                                 </div>
                                                 <div className="w-12 text-right text-sm text-gray-300">{count}</div>
@@ -620,19 +619,24 @@ const ReportPage = () => {
                                         <th className="px-4 py-3 sm:px-6">ID</th>
                                         <th className="px-4 py-3 sm:px-6">Title</th>
                                         <th className="px-4 py-3 sm:px-6">Company</th>
-                                        <th className="px-4 py-3 sm:px-6">Status</th>
-                                        <th className="px-4 py-3 sm:px-6">Priority</th>
-                                        <th className="px-4 py-3 sm:px-6">Customer</th>
                                         <th className="px-4 py-3 sm:px-6">Engineer</th>
                                         <th className="px-4 py-3 sm:px-6">Created</th>
-                                        <th className="px-4 py-3 sm:px-6">Description</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {filteredTickets.map((ticket) => (
                                         <tr
                                             key={ticket._id}
-                                            className="hover:bg-gray-700 hover:bg-opacity-50 border-t border-purple-600 border-opacity-30 transition-all duration-300"
+                                            className="hover:bg-gray-700 hover:bg-opacity-50 border-t border-purple-600 border-opacity-30 transition-all duration-300 cursor-pointer"
+                                            onClick={() => openTicketModal(ticket)}
+                                            role="button"
+                                            tabIndex={0}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    openTicketModal(ticket);
+                                                }
+                                            }}
                                         >
                                             <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[150px]">
                                                 {ticket.tid}
@@ -643,41 +647,11 @@ const ReportPage = () => {
                                             <td className="px-4 py-4 sm:px-6 truncate max-w-[150px] sm:max-w-[200px]">
                                                 {ticket.company?.name || 'No Company'}
                                             </td>
-                                            <td className="px-4 py-4 sm:px-6">
-                                                <span className={`px-2 py-1 rounded-full text-xs ${
-                                                    ticket.status === 'open' ? 'bg-gradient-to-r from-blue-500 to-indigo-500' :
-                                                    ticket.status === 'in-progress' ? 'bg-gradient-to-r from-yellow-500 to-amber-500' :
-                                                    ticket.status === 'closed' ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
-                                                    'bg-gradient-to-r from-gray-500 to-gray-600'
-                                                }`}>
-                                                    {ticket.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-4 sm:px-6">
-                                                <span className={`px-2 py-1 rounded-full text-xs ${
-                                                    ticket.priority === 1 ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
-                                                    ticket.priority === 2 ? 'bg-gradient-to-r from-yellow-500 to-amber-500' :
-                                                    ticket.priority === 3 ? 'bg-gradient-to-r from-orange-500 to-red-500' :
-                                                    'bg-gradient-to-r from-red-500 to-pink-500'
-                                                }`}>
-                                                    {ticket.priority}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-4 sm:px-6 truncate max-w-[150px] sm:max-w-[200px]">
-                                                {ticket.customer.name}
-                                            </td>
                                             <td className="px-4 py-4 sm:px-6 truncate max-w-[150px] sm:max-w-[200px]">
                                                 {ticket.assignedSupportEngineer?.name || 'Not Assigned'}
                                             </td>
                                             <td className="px-4 py-4 sm:px-6">
                                                 {new Date(ticket.createdAt).toLocaleDateString()}
-                                            </td>
-                                            <td className="px-4 py-4 sm:px-6 truncate max-w-[200px] sm:max-w-[250px]">
-                                                {ticket.description ? (
-                                                    ticket.description.length > 60 ? 
-                                                    `${ticket.description.substring(0, 60)}...` : 
-                                                    ticket.description
-                                                ) : 'No description'}
                                             </td>
                                         </tr>
                                     ))}
@@ -689,6 +663,86 @@ const ReportPage = () => {
                             </div>
                         )}
                     </div>
+                    {isModalOpen && selectedTicket && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                            <div className="bg-gray-800 bg-opacity-90 backdrop-blur-md rounded-xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-xl font-semibold text-gray-200">Ticket Details</h2>
+                                    <button
+                                        onClick={closeTicketModal}
+                                        className="text-purple-300 hover:text-white transition-colors"
+                                        aria-label="Close modal"
+                                    >
+                                        <FaTimes className="w-5 h-5" />
+                                    </button>
+                                </div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <span className="font-medium text-gray-200">ID: </span>
+                                        <span className="text-gray-300">{selectedTicket.tid}</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-medium text-gray-200">Title: </span>
+                                        <span className="text-gray-300">{selectedTicket.title}</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-medium text-gray-200">Description: </span>
+                                        <span className="text-gray-300">{selectedTicket.description || 'No description'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-medium text-gray-200">Status: </span>
+                                        <span className={`px-2 py-1 rounded-full text-xs ${
+                                            selectedTicket.status === 'open' ? 'bg-gradient-to-r from-blue-500 to-indigo-500' :
+                                            selectedTicket.status === 'in-progress' ? 'bg-gradient-to-r from-yellow-500 to-amber-500' :
+                                            selectedTicket.status === 'closed' ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
+                                            'bg-gradient-to-r from-gray-500 to-gray-600'
+                                        }`}>
+                                            {selectedTicket.status}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="font-medium text-gray-200">Priority: </span>
+                                        <span className={`px-2 py-1 rounded-full text-xs ${
+                                            selectedTicket.priority === 1 ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
+                                            selectedTicket.priority === 2 ? 'bg-gradient-to-r from-yellow-500 to-amber-500' :
+                                            selectedTicket.priority === 3 ? 'bg-gradient-to-r from-orange-500 to-red-500' :
+                                            'bg-gradient-to-r from-red-500 to-pink-500'
+                                        }`}>
+                                            {selectedTicket.priority}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="font-medium text-gray-200">Company: </span>
+                                        <span className="text-gray-300">{selectedTicket.company?.name || 'No Company'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-medium text-gray-200">Customer: </span>
+                                        <span className="text-gray-300">{selectedTicket.customer?.name || 'Unknown'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-medium text-gray-200">Engineer: </span>
+                                        <span className="text-gray-300">{selectedTicket.assignedSupportEngineer?.name || 'Not Assigned'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-medium text-gray-200">Created: </span>
+                                        <span className="text-gray-300">{new Date(selectedTicket.createdAt).toLocaleString()}</span>
+                                    </div>
+                                    {selectedTicket.review && (
+                                        <div>
+                                            <span className="font-medium text-gray-200">Review: </span>
+                                            <span className="text-gray-300">{selectedTicket.review}</span>
+                                        </div>
+                                    )}
+                                    {selectedTicket.rating && (
+                                        <div>
+                                            <span className="font-medium text-gray-200">Rating: </span>
+                                            <span className="text-gray-300">{selectedTicket.rating} Star{selectedTicket.rating > 1 ? 's' : ''}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
             <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-gray-800 bg-opacity-90 backdrop-blur-md border-t border-purple-600 border-opacity-30 z-50">
@@ -696,18 +750,21 @@ const ReportPage = () => {
                     <button
                         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                         className="p-3 text-purple-400 hover:text-white transition-colors sidebar-toggle"
+                        aria-label="Toggle sidebar"
                     >
                         <FaBars className="w-5 h-5" />
                     </button>
                     <button
                         onClick={() => navigate('/dashboard')}
                         className="p-3 text-purple-400 hover:text-white transition-colors"
+                        aria-label="Go to dashboard"
                     >
                         <FaHome className="w-5 h-5" />
                     </button>
                     <button
                         onClick={() => navigate('/account')}
                         className="p-3 text-purple-400 hover:text-white transition-colors"
+                        aria-label="Go to account"
                     >
                         <FaUser className="w-5 h-5" />
                     </button>
