@@ -8,8 +8,11 @@ const PORT = process.env.PORT || 5000;
 
 app.use(cors({
     origin: ['https://help-system-ochre.vercel.app', 'https://help-system-c149ct6ov-rakhithas-projects.vercel.app'],
-    credentials: true, // Allow cookies if you're using them
-  }))
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Include allowed methods
+    allowedHeaders: ['Content-Type', 'Authorization'] // Include allowed headers
+}));
+
 app.use(express.json());
 
 // Connect to MongoDB
