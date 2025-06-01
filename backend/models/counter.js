@@ -7,6 +7,6 @@ const counterSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Explicitly specify the collection name
-const Counter = mongoose.model('Counter', counterSchema, 'counters'); // 'counters' is the collection name in DB
+const Counter = mongoose.model('Counter', counterSchema, 'counters'); 
 
 module.exports = Counter;
