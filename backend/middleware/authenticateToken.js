@@ -15,7 +15,7 @@ const authenticateToken = async (req, res, next) => {
         // Attach the user details from the token to the request
         req.user = {
             id: decoded.id,
-            username: decoded.username,
+            email: decoded.email,
             uid: decoded.uid,
             role: decoded.role
         };

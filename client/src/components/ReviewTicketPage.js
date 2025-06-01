@@ -12,13 +12,18 @@ const ReviewTicketPage = () => {
     const submitReview = async () => {
         try {
             const token = localStorage.getItem('token');
-            await axios.post(
+            const response = await axios.post(
                 `${process.env.REACT_APP_BACKEND_BASEURL}/tickets/review/${ticketId}`,
                 { review, rating },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             setMessage('Review submitted successfully!');
-            setTimeout(() => navigate('/view-tickets'), 2000); // Redirect after submission
+            // Pass the updated ticket back to ManageTickets
+            setTimeout(() => {
+                navigate('/view-tickets', {
+                    state: { updatedTicket: { ...response.data.ticket, reviewed: true } }
+                });
+            }, 2000);
         } catch (error) {
             setMessage(error.response?.data?.message || 'Failed to submit review');
         }

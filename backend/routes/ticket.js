@@ -4,53 +4,91 @@ const User = require('../models/User');
 const Company = require('../models/Company');
 const authenticateToken = require('../middleware/authenticateToken');
 const Counter = require('../models/counter');
+const Notification = require('../models/notification');
 
 const router = express.Router();
 
 router.post('/', authenticateToken, async (req, res) => {
     try {
         const { title, description, priority, customerUid, assignedSupportEngineer } = req.body;
-        const userRole = req.user.role;
-        const userUid = req.user.uid;
+        const { role: userRole, uid: userUid, id: userId } = req.user;
+
+        // Fetch user status
+        const user = await User.findById(userId).select('userStatus');
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        if (user.userStatus === 'inactive') {
+            return res.status(403).json({ message: 'Access Denied: Your account is inactive' });
+        }
 
         // Validate required fields
-        if (!title || !description || !priority) {
-            return res.status(400).json({ message: 'Missing required fields' });
+        if (!title || !description) {
+            return res.status(400).json({ message: 'Title and description are required' });
+        }
+
+        let finalPriority;
+
+        // Validate priority based on role
+        if (userRole === 'customer') {
+            // Customers get default priority of 1
+            finalPriority = 1;
+        } else {
+            // Admins and support engineers must provide priority
+            if (!priority) {
+                return res.status(400).json({ message: 'Priority is required for admins and support engineers' });
+            }
+            // Ensure priority is a number between 1 and 5
+            const priorityNum = parseInt(priority, 10);
+            if (isNaN(priorityNum) || priorityNum < 1 || priorityNum > 5) {
+                return res.status(400).json({ message: 'Priority must be a number between 1 and 5' });
+            }
+            finalPriority = priorityNum;
         }
 
         let finalCustomerUid;
-        let finalAssignedEngineer = null; // Default to null unless assigned
+        let finalAssignedEngineer = null;
 
+        // Role-based logic
         if (userRole === 'admin') {
-            // Admin must provide a customer and support engineer
             if (!customerUid || !assignedSupportEngineer) {
-                return res.status(400).json({ message: 'Admin must assign a customer and a support engineer' });
+                return res.status(400).json({ message: 'Admin must provide customerUid and assignedSupportEngineer' });
+            }
+            const customer = await User.findOne({ uid: customerUid, role: 'customer' });
+            if (!customer) {
+                return res.status(400).json({ message: 'Invalid customer UID' });
+            }
+            const engineer = await User.findOne({ uid: assignedSupportEngineer, role: 'support_engineer' });
+            if (!engineer) {
+                return res.status(400).json({ message: 'Invalid support engineer UID' });
             }
             finalCustomerUid = customerUid;
             finalAssignedEngineer = assignedSupportEngineer;
         } else if (userRole === 'support_engineer') {
-            // Support engineers must select a customer, and they assign themselves
             if (!customerUid) {
-                return res.status(400).json({ message: 'Support engineer must assign a customer' });
+                return res.status(400).json({ message: 'Support engineer must provide customerUid' });
+            }
+            const customer = await User.findOne({ uid: customerUid, role: 'customer' });
+            if (!customer) {
+                return res.status(400).json({ message: 'Invalid customer UID' });
             }
             finalCustomerUid = customerUid;
             finalAssignedEngineer = userUid;
         } else if (userRole === 'customer') {
-            // Customers create their own ticket, no assigned support engineer
             finalCustomerUid = userUid;
         } else {
-            return res.status(403).json({ message: 'Unauthorized: Only admins, support engineers, and customers can create tickets' });
+            return res.status(403).json({ message: 'Unauthorized: Invalid role for creating tickets' });
         }
 
-        // Increment the ticket counter
+        // Increment ticket counter
         const counter = await Counter.findOneAndUpdate(
             { name: 'ticket_tid' },
             { $inc: { count: 1 } },
             { new: true, upsert: true }
         );
 
-        if (!counter) {
-            throw new Error('Failed to initialize or update ticket counter');
+        if (!counter || !counter.count) {
+            throw new Error('Failed to increment ticket counter');
         }
 
         const tid = counter.count;
@@ -60,41 +98,63 @@ router.post('/', authenticateToken, async (req, res) => {
             tid,
             title,
             description,
-            priority,
-            uid: finalCustomerUid, // Assign customer UID
-            assignedSupportEngineer: finalAssignedEngineer, // Assign based on role
-            status: "not started",
+            priority: finalPriority,
+            uid: finalCustomerUid,
+            assignedSupportEngineer: finalAssignedEngineer,
+            status: 'not started',
         });
 
         await newTicket.save();
-        res.status(201).json(newTicket);
+
+        return res.status(201).json({
+            message: 'Ticket created successfully',
+            ticket: newTicket,
+        });
     } catch (error) {
-        console.error('Error creating ticket:', error);
-        res.status(500).json({ message: 'Failed to create ticket', error: error.message });
+        console.error('Error creating ticket:', {
+            error: error.message,
+            userId: req.user?.id,
+            role: req.user?.role,
+            body: req.body,
+        });
+
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ message: 'Invalid ticket data', details: error.message });
+        }
+        if (error.name === 'MongoServerError' && error.code === 11000) {
+            return res.status(400).json({ message: 'Duplicate ticket ID' });
+        }
+
+        return res.status(500).json({ message: 'Failed to create ticket' });
     }
 });
 
 
-
-
-
-// View all tickets (Only accessible by Admin, Customers, and Support Engineers)
+// View all tickets
 router.get('/view-tickets', authenticateToken, async (req, res) => {
     try {
         const user = req.user;
 
-        if(!user) {
+        if (!user) {
             return res.status(403).json({ message: 'Access Denied' });
         }
 
+        let tickets;
+
         if (user.role === 'customer') {
-            // Customer can only see their own tickets
-            const tickets = await Ticket.find({ uid: user.uid });
-            return res.json({ tickets, role: user.role });
+            // Customers can only see their own tickets (not deleted)
+            tickets = await Ticket.find({ uid: user.uid, status: { $ne: 'inactive' } });
+        } else if (user.role === 'support') {
+            // Support engineers can only see tickets assigned to them (not deleted)
+            tickets = await Ticket.find({ assignedTo: user.uid, status: { $ne: 'inactive' } });
+        } else if (user.role === 'admin') {
+            // Admins can see all tickets (not deleted)
+            tickets = await Ticket.find({ status: { $ne: 'inactive' } });
         } else {
-            const tickets = await Ticket.find();
-            return res.json(tickets);
+            return res.status(403).json({ message: 'Invalid role' });
         }
+
+        return res.json({ tickets, role: user.role });
 
     } catch (error) {
         console.error(error);
@@ -103,73 +163,192 @@ router.get('/view-tickets', authenticateToken, async (req, res) => {
 });
 
 router.put('/update-ticket/:id', authenticateToken, async (req, res) => {
-    try {
-        const { status, priority, assignedSupportEngineer, description } = req.body;
-        const user = req.user;
+  const { status, priority, assignedSupportEngineer } = req.body;
+  const uid = req.user.uid;
+  const role = req.user.role;
 
-        // Find the ticket
-        const ticket = await Ticket.findById(req.params.id, );
-        if (!ticket) {
-            return res.status(404).json({ message: 'Ticket not found' });
-        }
-
-        // If the user is a customer, restrict updates to only the description
-        if (user.role === 'customer') {
-            if (Object.keys(req.body).some(key => key !== 'description')) {
-                return res.status(403).json({ message: 'You are only allowed to update the description.' });
-            }
-            ticket.description = description;
-        } else {
-            // For other roles, allow updates to status, priority, and assignedSupportEngineer
-            if (status) ticket.status = status;
-            if (priority) ticket.priority = priority;
-            if (assignedSupportEngineer) ticket.assignedSupportEngineer = assignedSupportEngineer;
-            if (description) ticket.description = description;
-        }
-
-        // Save the updated ticket
-        const updatedTicket = await ticket.save();
-
-        res.status(200).json(updatedTicket);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to update ticket', error: error.message });
+  try {
+    const ticket = await Ticket.findById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ message: 'Ticket not found' });
     }
+
+    // Authorization checks
+    if (role === 'customer' && ticket.uid !== uid) {
+      return res.status(403).json({ message: 'You can only update your own tickets' });
+    }
+    if (role === 'support_engineer' && ticket.assignedSupportEngineer !== uid) {
+      return res.status(403).json({ message: 'You can only update tickets assigned to you' });
+    }
+
+    // Validate updates
+    const updates = {};
+    if (status && ['not started', 'in progress', 'stuck', 'done'].includes(status)) {
+      updates.status = status;
+    }
+    if (priority && Number.isInteger(Number(priority)) && priority >= 1 && priority <= 5) {
+      updates.priority = Number(priority);
+    }
+    if (role === 'admin' && assignedSupportEngineer !== undefined) {
+      // Allow null to unassign or a valid UID
+      if (assignedSupportEngineer === null || (typeof assignedSupportEngineer === 'string' && assignedSupportEngineer.length > 0)) {
+        updates.assignedSupportEngineer = assignedSupportEngineer;
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: 'No valid updates provided' });
+    }
+
+    // Update ticket
+    Object.assign(ticket, updates);
+    await ticket.save();
+
+    res.status(200).json(ticket);
+  } catch (error) {
+    console.error('Error updating ticket:', error);
+    res.status(500).json({ message: 'Failed to update ticket', error: error.message });
+  }
 });
 
 router.delete('/delete-ticket/:id', authenticateToken, async (req, res) => {
-    try {
-        const ticket = await Ticket.findByIdAndDelete(req.params.id);
-
-        if (!ticket) {
-            return res.status(404).json({ message: 'Ticket not found' });
-        }
-
-        res.status(200).json({ message: 'Ticket deleted successfully', ticket });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Failed to delete ticket', error: error.message });
+    const { reason } = req.body;
+    const uid = req.user.uid;
+  
+    // Validate reason
+    if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
+      return res.status(400).json({ message: 'Reason is required and must be a non-empty string' });
     }
-});
-
-
-router.get('/ticket-counts', async (req, res) => {
-    const { role, uid } = req.headers;
-
+    if (reason.length > 500) {
+      return res.status(400).json({ message: 'Reason must not exceed 500 characters' });
+    }
+  
     try {
-        let query = {};
-        if (role === 'customer') {
-            query = { uid: uid };
-        } else if (role === 'support-engineer') {
-            query = { assignedSupportEngineer: uid };
+      const ticket = await Ticket.findById(req.params.id);
+      if (!ticket) {
+        return res.status(404).json({ message: 'Ticket not found' });
+      }
+  
+      // Mark the ticket as deleted
+      ticket.status = 'deleted';
+      ticket.deletedBy = uid;
+      ticket.deletedAt = new Date();
+      ticket.reason = reason.trim();
+      await ticket.save();
+  
+      // Prepare notification(s)
+      const notifications = [];
+      const customerUid = ticket.uid;
+      const engineerUid = ticket.assignedSupportEngineer !== 'Not Assigned' ? ticket.assignedSupportEngineer : null;
+      const ticketId = ticket.tid.toString(); // Convert tid to string
+  
+      const message = `Ticket ${ticketId} has been deleted by ${uid}`;
+  
+      if (req.user.role === 'admin') {
+        if (customerUid) {
+          notifications.push({
+            receiverUid: customerUid,
+            senderUid: uid,
+            ticketId,
+            message,
+            reason: reason.trim()
+          });
         }
+        if (engineerUid) {
+          notifications.push({
+            receiverUid: engineerUid,
+            senderUid: uid,
+            ticketId,
+            message,
+            reason: reason.trim()
+          });
+        }
+      } else if (uid === customerUid && engineerUid) {
+        notifications.push({
+          receiverUid: engineerUid,
+          senderUid: uid,
+          ticketId,
+          message,
+          reason: reason.trim()
+        });
+      } else if (uid === engineerUid && customerUid) {
+        notifications.push({
+          receiverUid: customerUid,
+          senderUid: uid,
+          ticketId,
+          message,
+          reason: reason.trim()
+        });
+      }
+  
+      // Save notifications
+      if (notifications.length > 0) {
+        console.log(`Sending ${notifications.length} notifications for ticket ${ticketId}`);
+        await Notification.insertMany(notifications);
+      }
+  
+      res.status(200).json({ message: 'Ticket marked as deleted and notifications sent.', ticket });
+    } catch (error) {
+      console.error('Error deleting ticket:', error);
+      res.status(500).json({ message: 'Failed to delete ticket', error: error.message });
+    }
+  });
 
-        const openTickets = await Ticket.countDocuments({ ...query, status: 'not started' });
-        const pendingTickets = await Ticket.countDocuments({ ...query, status: 'in progress' });
-        const solvedTickets = await Ticket.countDocuments({ ...query, status: 'done' });
-        const unassignedTickets = await Ticket.countDocuments({ ...query, assignedSupportEngineer: 'Not Assigned' });
+router.get('/ticket-counts', authenticateToken, async (req, res) => {
+    try {
+        const { role, uid } = req.user;
+        
+        let baseQuery = {};
+        
+        // Apply role-based filtering for assigned tickets
+        if (role === 'customer') {
+            baseQuery = { uid: uid };
+        } else if (role === 'support_engineer') {
+            baseQuery = { assignedSupportEngineer: uid };
+        }
+        // Admin sees all tickets (no filter applied)
 
-        res.status(200).json({ openTickets, pendingTickets, solvedTickets, unassignedTickets });
+        // Count tickets by status with role-based filtering
+        const openTickets = await Ticket.countDocuments({ 
+            ...baseQuery, 
+            status: 'not started' 
+        });
+        
+        const pendingTickets = await Ticket.countDocuments({ 
+            ...baseQuery, 
+            status: 'in progress' 
+        });
+        
+        const solvedTickets = await Ticket.countDocuments({ 
+            ...baseQuery, 
+            status: 'done' 
+        });
+        
+        // Unassigned tickets logic - NO role-based filtering for customers/support engineers
+        let unassignedQuery = {
+            $or: [
+                { assignedSupportEngineer: null },
+                { assignedSupportEngineer: 'Not Assigned' },
+                { assignedSupportEngineer: '' },
+                { assignedSupportEngineer: { $exists: false } }
+            ]
+        };
+        
+        // Only customers should see their own unassigned tickets
+        // Support engineers and admins should see ALL unassigned tickets
+        if (role === 'customer') {
+            unassignedQuery.uid = uid;
+        }
+        
+        const unassignedTickets = await Ticket.countDocuments(unassignedQuery);
+
+        res.status(200).json({ 
+            openTickets, 
+            pendingTickets, 
+            solvedTickets, 
+            unassignedTickets 
+        });
+        
     } catch (error) {
         console.error('Error fetching ticket counts:', error);
         res.status(500).json({ message: 'Failed to fetch ticket counts' });
@@ -248,6 +427,7 @@ router.get('/report', authenticateToken, async (req, res) => {
                     priority: 1,
                     createdAt: 1,
                     updatedAt: 1,
+                    resolvedAt: 1,
                     customer: {
                         uid: '$userDetails.uid',
                         name: { $concat: ['$userDetails.firstName', ' ', '$userDetails.lastName'] },
@@ -270,12 +450,14 @@ router.get('/report', authenticateToken, async (req, res) => {
         // Calculate metrics
         const allTicketsCount = reportData.length;
 
-        const doneTickets = reportData.filter(ticket => ticket.status === 'done');
-        const averageTime = doneTickets.reduce((acc, ticket) => {
-            const createdAt = new Date(ticket.createdAt);
-            const updatedAt = new Date(ticket.updatedAt);
-            return acc + (updatedAt - createdAt);
-        }, 0) / (doneTickets.length || 1);
+        const closedTickets = reportData.filter(ticket => ticket.status === 'closed' && ticket.resolvedAt);
+        const averageTime = closedTickets.length
+            ? closedTickets.reduce((acc, ticket) => {
+                  const createdAt = new Date(ticket.createdAt);
+                  const resolvedAt = new Date(ticket.resolvedAt);
+                  return acc + (resolvedAt - createdAt);
+              }, 0) / (closedTickets.length * 1000 * 60 * 60) // Convert to hours
+            : 0;
 
         const ticketsByStatus = reportData.reduce((acc, ticket) => {
             acc[ticket.status] = (acc[ticket.status] || 0) + 1;
@@ -289,21 +471,24 @@ router.get('/report', authenticateToken, async (req, res) => {
         }, {});
 
         const ticketsByCustomer = reportData.reduce((acc, ticket) => {
-            const customerName = ticket.customer.name;
+            const customerName = ticket.customer?.name || 'Unknown';
             acc[customerName] = (acc[customerName] || 0) + 1;
             return acc;
         }, {});
 
         const ticketsByPriority = reportData.reduce((acc, ticket) => {
-            acc[ticket.priority] = (acc[ticket.priority] || 0) + 1;
+            const priority = ticket.priority.toString();
+            acc[priority] = (acc[priority] || 0) + 1;
             return acc;
         }, {});
 
-        const reviews = reportData.filter(ticket => ticket.review).map(ticket => ({
-            review: ticket.review,
-            rating: ticket.rating,
-            customer: ticket.customer.name
-        }));
+        const reviews = reportData
+            .filter(ticket => ticket.review || ticket.rating)
+            .map(ticket => ({
+                review: ticket.review || 'No review',
+                rating: ticket.rating || null,
+                customer: ticket.customer?.name || 'Unknown'
+            }));
 
         res.status(200).json({
             allTicketsCount,
@@ -370,6 +555,168 @@ router.get('/reviews', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Failed to fetch reviews' });
+    }
+});
+
+
+router.get('/tickets-by-status-with-company', authenticateToken, async (req, res) => {
+    try {
+        const { type } = req.query;
+        const { role, uid } = req.user;
+
+        let query = {};
+        
+        // Define status/type mapping
+        if (type === 'open') {
+            query.status = 'not started';
+        } else if (type === 'pending') {
+            query.status = 'in progress';
+        } else if (type === 'solved') {
+            query.status = 'done';
+        } else if (type === 'unassigned') {
+            query.$or = [
+                { assignedSupportEngineer: null },
+                { assignedSupportEngineer: 'Not Assigned' },
+                { assignedSupportEngineer: '' },
+                { assignedSupportEngineer: { $exists: false } }
+            ];
+        } else {
+            return res.status(400).json({ message: 'Invalid ticket type' });
+        }
+
+        // Apply role-based filtering
+        if (role === 'customer') {
+            // Customers see only their own tickets for all types
+            query.uid = uid;
+        } else if (role === 'support_engineer') {
+            if (type === 'unassigned') {
+                // Support engineers see ALL unassigned tickets (no additional filter)
+                // The unassigned query is already applied above
+            } else {
+                // For assigned tickets, support engineers see only tickets assigned to them
+                query.assignedSupportEngineer = uid;
+            }
+        }
+        // Admin sees all tickets (no additional filtering)
+
+        console.log('Final query for tickets:', JSON.stringify(query, null, 2));
+        console.log('User role:', role, 'User ID:', uid, 'Type:', type);
+
+        // Fetch tickets with user and company details
+        const tickets = await Ticket.aggregate([
+            { $match: query },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'uid',
+                    foreignField: 'uid',
+                    as: 'user',
+                },
+            },
+            { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: 'companies',
+                    localField: 'user.companyId',
+                    foreignField: 'companyId',
+                    as: 'company',
+                },
+            },
+            { $unwind: { path: '$company', preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    tid: 1,
+                    title: 1,
+                    priority: 1,
+                    status: 1,
+                    assignedSupportEngineer: 1,
+                    createdAt: 1,
+                    uid: 1,
+                    companyName: '$company.name',
+                    customerName: '$user.name',
+                    customerEmail: '$user.email'
+                },
+            },
+            { $sort: { createdAt: -1 } }
+        ]);
+
+        console.log(`Found ${tickets.length} tickets for type: ${type}`);
+        
+        res.status(200).json(tickets);
+        
+    } catch (error) {
+        console.error('Error fetching tickets with company:', {
+            error: error.message,
+            userId: req.user?.uid,
+            role: req.user?.role,
+            query: req.query,
+            stack: error.stack
+        });
+        res.status(500).json({ message: 'Failed to fetch tickets' });
+    }
+});
+
+
+router.get('/view-tickets-with-company', authenticateToken, async (req, res) => {
+    try {
+        const { role, uid } = req.user;
+
+        // Define query based on role
+        let query = {};
+        if (role === 'customer') {
+            query.uid = uid;
+        } else if (role === 'support_engineer') {
+            query.assignedSupportEngineer = uid;
+        } // Admins get all tickets
+
+        // Exclude inactive and deleted tickets
+        query.status = { $nin: ['inactive', 'deleted'] };
+
+        // Fetch tickets with user and company details
+        const tickets = await Ticket.aggregate([
+            { $match: query },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'uid',
+                    foreignField: 'uid',
+                    as: 'user',
+                },
+            },
+            { $unwind: '$user' },
+            {
+                $lookup: {
+                    from: 'companies',
+                    localField: 'user.companyId',
+                    foreignField: 'companyId',
+                    as: 'company',
+                },
+            },
+            { $unwind: { path: '$company', preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    _id: 1,
+                    tid: 1,
+                    title: 1,
+                    description: 1,
+                    uid: 1,
+                    status: 1,
+                    priority: 1,
+                    assignedSupportEngineer: 1,
+                    createdAt: 1,
+                    companyName: '$company.name',
+                },
+            },
+        ]);
+
+        res.status(200).json({ tickets, role });
+    } catch (error) {
+        console.error('Error fetching tickets with company:', {
+            error: error.message,
+            userId: req.user?.id,
+            role: req.user?.role,
+        });
+        res.status(500).json({ message: 'Failed to fetch tickets' });
     }
 });
 
