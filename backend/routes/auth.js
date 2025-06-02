@@ -135,15 +135,16 @@ router.post('/login', async (req, res) => {
 
 router.get('/support-engineers', authenticateToken, async (req, res) => {
     try {
-        const supportEngineers = await User.find(
-            { role: 'support_engineer', userStatus: 'active' },
-            'firstName uid'
-        );
-        res.status(200).json(supportEngineers);
-        console.log('Support Engineers:', supportEngineers);
-    } catch (error) {
-        console.error('Error fetching support engineers:', error);
-        res.status(500).json({ message: 'Failed to fetch support engineers' });
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+        const engineers = await User.find({ 
+            role: 'support_engineer',
+            userStatus: 'active'
+        }).select('uid firstName lastName');
+        res.json(engineers);
+    } catch (err) {
+        res.status(500).json({ message: 'Failed to fetch support engineers', error: err.message });
     }
 });
 

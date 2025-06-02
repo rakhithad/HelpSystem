@@ -214,85 +214,110 @@ router.put('/update-ticket/:id', authenticateToken, async (req, res) => {
 router.delete('/delete-ticket/:id', authenticateToken, async (req, res) => {
     const { reason } = req.body;
     const uid = req.user.uid;
-  
+
     // Validate reason
     if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
-      return res.status(400).json({ message: 'Reason is required and must be a non-empty string' });
+        return res.status(400).json({ message: 'Reason is required and must be a non-empty string' });
     }
     if (reason.length > 500) {
-      return res.status(400).json({ message: 'Reason must not exceed 500 characters' });
+        return res.status(400).json({ message: 'Reason must not exceed 500 characters' });
     }
-  
+
     try {
-      const ticket = await Ticket.findById(req.params.id);
-      if (!ticket) {
-        return res.status(404).json({ message: 'Ticket not found' });
-      }
-  
-      // Mark the ticket as deleted
-      ticket.status = 'deleted';
-      ticket.deletedBy = uid;
-      ticket.deletedAt = new Date();
-      ticket.reason = reason.trim();
-      await ticket.save();
-  
-      // Prepare notification(s)
-      const notifications = [];
-      const customerUid = ticket.uid;
-      const engineerUid = ticket.assignedSupportEngineer !== 'Not Assigned' ? ticket.assignedSupportEngineer : null;
-      const ticketId = ticket.tid.toString(); // Convert tid to string
-  
-      const message = `Ticket ${ticketId} has been deleted by ${uid}`;
-  
-      if (req.user.role === 'admin') {
+        const ticket = await Ticket.findById(req.params.id);
+        if (!ticket) {
+            return res.status(404).json({ message: 'Ticket not found' });
+        }
+
+        // Mark the ticket as deleted
+        ticket.status = 'deleted';
+        ticket.deletedBy = uid;
+        ticket.deletedAt = new Date();
+        ticket.reason = reason.trim();
+        await ticket.save();
+
+        // Fetch sender's name
+        const sender = await User.findOne({ uid });
+        const senderName = sender ? `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || 'Unknown User' : 'Unknown User';
+
+        // Prepare notification(s)
+        const notifications = [];
+        const customerUid = ticket.uid;
+        const engineerUid = ticket.assignedSupportEngineer !== 'Not Assigned' ? ticket.assignedSupportEngineer : null;
+        const ticketId = ticket.tid.toString();
+
+        const message = `Ticket ${ticketId} has been deleted by ${senderName}`;
+
+        // Fetch customer and engineer names
+        let customerName = null;
+        let engineerName = null;
+
         if (customerUid) {
-          notifications.push({
-            receiverUid: customerUid,
-            senderUid: uid,
-            ticketId,
-            message,
-            reason: reason.trim()
-          });
+            const customer = await User.findOne({ uid: customerUid });
+            customerName = customer ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || 'Unknown User' : 'Unknown User';
         }
         if (engineerUid) {
-          notifications.push({
-            receiverUid: engineerUid,
-            senderUid: uid,
-            ticketId,
-            message,
-            reason: reason.trim()
-          });
+            const engineer = await User.findOne({ uid: engineerUid });
+            engineerName = engineer ? `${engineer.firstName || ''} ${engineer.lastName || ''}`.trim() || 'Unknown User' : 'Unknown User';
         }
-      } else if (uid === customerUid && engineerUid) {
-        notifications.push({
-          receiverUid: engineerUid,
-          senderUid: uid,
-          ticketId,
-          message,
-          reason: reason.trim()
-        });
-      } else if (uid === engineerUid && customerUid) {
-        notifications.push({
-          receiverUid: customerUid,
-          senderUid: uid,
-          ticketId,
-          message,
-          reason: reason.trim()
-        });
-      }
-  
-      // Save notifications
-      if (notifications.length > 0) {
-        console.log(`Sending ${notifications.length} notifications for ticket ${ticketId}`);
-        await Notification.insertMany(notifications);
-      }
-  
-      res.status(200).json({ message: 'Ticket marked as deleted and notifications sent.', ticket });
+
+        if (req.user.role === 'admin') {
+            if (customerUid) {
+                notifications.push({
+                    receiverUid: customerUid,
+                    receiverName: customerName,
+                    senderUid: uid,
+                    senderName,
+                    ticketId,
+                    message,
+                    reason: reason.trim(),
+                });
+            }
+            if (engineerUid) {
+                notifications.push({
+                    receiverUid: engineerUid,
+                    receiverName: engineerName,
+                    senderUid: uid,
+                    senderName,
+                    ticketId,
+                    message,
+                    reason: reason.trim(),
+                });
+            }
+        } else if (uid === customerUid && engineerUid) {
+            notifications.push({
+                receiverUid: engineerUid,
+                receiverName: engineerName,
+                senderUid: uid,
+                senderName,
+                ticketId,
+                message,
+                reason: reason.trim(),
+            });
+        } else if (uid === engineerUid && customerUid) {
+            notifications.push({
+                receiverUid: customerUid,
+                receiverName: customerName,
+                senderUid: uid,
+                senderName,
+                ticketId,
+                message,
+                reason: reason.trim(),
+            });
+        }
+
+        // Save notifications
+        if (notifications.length > 0) {
+            console.log(`Sending ${notifications.length} notifications for ticket ${ticketId}`);
+            await Notification.insertMany(notifications);
+        }
+
+        res.status(200).json({ message: 'Ticket marked as deleted and notifications sent.', ticket });
     } catch (error) {
-      console.error('Error deleting ticket:', error);
-      res.status(500).json({ message: 'Failed to delete ticket', error: error.message });
+        console.error('Error deleting ticket:', error);
+        res.status(500).json({ message: 'Failed to delete ticket', error: error.message });
     }
-  });
+});
 
 router.get('/ticket-counts', authenticateToken, async (req, res) => {
     try {
@@ -672,27 +697,41 @@ router.get('/view-tickets-with-company', authenticateToken, async (req, res) => 
         // Exclude inactive and deleted tickets
         query.status = { $nin: ['inactive', 'deleted'] };
 
-        // Fetch tickets with user and company details
+        // Fetch tickets with user, engineer, and company details
         const tickets = await Ticket.aggregate([
             { $match: query },
+            // Lookup for customer (uid)
             {
                 $lookup: {
                     from: 'users',
                     localField: 'uid',
                     foreignField: 'uid',
-                    as: 'user',
+                    as: 'customer',
                 },
             },
-            { $unwind: '$user' },
+            { $unwind: '$customer' },
+            // Lookup for assigned support engineer
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'assignedSupportEngineer',
+                    foreignField: 'uid',
+                    as: 'engineer',
+                },
+            },
+            // Unwind engineer, preserving null for unassigned engineers
+            { $unwind: { path: '$engineer', preserveNullAndEmptyArrays: true } },
+            // Lookup for company
             {
                 $lookup: {
                     from: 'companies',
-                    localField: 'user.companyId',
+                    localField: 'customer.companyId',
                     foreignField: 'companyId',
                     as: 'company',
                 },
             },
             { $unwind: { path: '$company', preserveNullAndEmptyArrays: true } },
+            // Project the desired fields
             {
                 $project: {
                     _id: 1,
@@ -704,7 +743,47 @@ router.get('/view-tickets-with-company', authenticateToken, async (req, res) => 
                     priority: 1,
                     assignedSupportEngineer: 1,
                     createdAt: 1,
-                    companyName: '$company.name',
+                    companyName: { $ifNull: ['$company.name', 'No Company'] },
+                    customerName: {
+                        $concat: [
+                            { $ifNull: ['$customer.firstName', ''] },
+                            { $cond: [{ $eq: ['$customer.firstName', ''] }, '', ' '] },
+                            { $ifNull: ['$customer.lastName', ''] },
+                            { $cond: [
+                                {
+                                    $and: [
+                                        { $eq: ['$customer.firstName', ''] },
+                                        { $eq: ['$customer.lastName', ''] },
+                                    ],
+                                },
+                                'Unknown User',
+                                '',
+                            ]},
+                        ],
+                    },
+                    engineerName: {
+                        $cond: [
+                            { $eq: ['$assignedSupportEngineer', null] },
+                            'Unassigned',
+                            {
+                                $concat: [
+                                    { $ifNull: ['$engineer.firstName', ''] },
+                                    { $cond: [{ $eq: ['$engineer.firstName', ''] }, '', ' '] },
+                                    { $ifNull: ['$engineer.lastName', ''] },
+                                    { $cond: [
+                                        {
+                                            $and: [
+                                                { $eq: ['$engineer.firstName', ''] },
+                                                { $eq: ['$engineer.lastName', ''] },
+                                            ],
+                                        },
+                                        'Unknown User',
+                                        '',
+                                    ]},
+                                ],
+                            },
+                        ],
+                    },
                 },
             },
         ]);
@@ -719,6 +798,8 @@ router.get('/view-tickets-with-company', authenticateToken, async (req, res) => 
         res.status(500).json({ message: 'Failed to fetch tickets' });
     }
 });
+
+
 
 
 module.exports = router;

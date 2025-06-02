@@ -19,19 +19,16 @@ const ManageTickets = () => {
     const [deleteReason, setDeleteReason] = useState('');
     const [editingTicketId, setEditingTicketId] = useState(null);
     const navigate = useNavigate();
-    const location = useLocation(); // Access navigation state
-
+    const location = useLocation();
     const token = localStorage.getItem('token');
     const userUid = localStorage.getItem('uid');
 
-    // Redirect to login if no token
     useEffect(() => {
         if (!token) {
             navigate('/login');
         }
     }, [token, navigate]);
 
-    // Handle updated ticket from ReviewTicketPage
     useEffect(() => {
         if (location.state?.updatedTicket) {
             const updatedTicket = location.state.updatedTicket;
@@ -49,12 +46,10 @@ const ManageTickets = () => {
                         : ticket
                 )
             );
-            // Clear the location state to prevent reprocessing
             navigate('/view-tickets', { replace: true, state: {} });
         }
     }, [location.state, navigate]);
 
-    // Close sidebar when clicking outside on mobile
     useEffect(() => {
         const handleClickOutside = (event) => {
             const sidebar = document.querySelector('.sidebar-container');
@@ -74,7 +69,6 @@ const ManageTickets = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isSidebarOpen]);
 
-    // Disable body scroll when sidebar is open on mobile
     useEffect(() => {
         if (window.innerWidth < 1024) {
             document.body.style.overflow = isSidebarOpen ? 'hidden' : 'auto';
@@ -84,13 +78,11 @@ const ManageTickets = () => {
         };
     }, [isSidebarOpen]);
 
-    // Fetch tickets and support engineers
     useEffect(() => {
         const fetchData = async () => {
             setIsLoading(true);
             setError(null);
             try {
-                // Fetch tickets with company details
                 const ticketsResponse = await axios.get(
                     `${process.env.REACT_APP_BACKEND_BASEURL}/tickets/view-tickets-with-company`,
                     { headers: { Authorization: `Bearer ${token}` } }
@@ -99,7 +91,6 @@ const ManageTickets = () => {
                 setFilteredTickets(ticketsResponse.data.tickets);
                 setUserRole(ticketsResponse.data.role);
 
-                // Fetch support engineers (only for admins)
                 if (ticketsResponse.data.role === 'admin') {
                     const engineersResponse = await axios.get(
                         `${process.env.REACT_APP_BACKEND_BASEURL}/auth/support-engineers`,
@@ -119,7 +110,6 @@ const ManageTickets = () => {
         }
     }, [token]);
 
-    // Apply filters (only for admins)
     useEffect(() => {
         if (userRole !== 'admin') {
             setFilteredTickets(tickets);
@@ -130,6 +120,10 @@ const ManageTickets = () => {
 
         if (filters.status) {
             filtered = filtered.filter((ticket) => ticket.status === filters.status);
+        }
+
+        if (tickets.companyName) {
+            filtered = filtered.filter((ticket) => ticket.companyName === filters.companyName);
         }
 
         if (filters.date !== 'all') {
@@ -168,12 +162,26 @@ const ManageTickets = () => {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
+            // Fetch updated names if engineer assignment changed
+            let engineerName = updates.assignedSupportEngineer;
+            if (updates.assignedSupportEngineer) {
+                const engineerResponse = await axios.get(
+                    `${process.env.REACT_APP_BACKEND_BASEURL}/auth/user/${updates.assignedSupportEngineer}`,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+                engineerName = engineerResponse.data
+                    ? `${engineerResponse.data.firstName || ''} ${engineerResponse.data.lastName || ''}`.trim() || 'Unknown User'
+                    : 'Unassigned';
+            }
+
             setTickets((prevTickets) =>
                 prevTickets.map((ticket) =>
-                    ticket._id === ticketId ? { ...ticket, ...updates } : ticket
+                    ticket._id === ticketId
+                        ? { ...ticket, ...updates, engineerName }
+                        : ticket
                 )
             );
-            setEditingTicketId(null); // Exit edit mode after update
+            setEditingTicketId(null);
             setError(null);
             setSuccess('Ticket updated successfully!');
         } catch (err) {
@@ -373,7 +381,7 @@ const ManageTickets = () => {
                                         <th className="px-4 py-3 sm:px-6">TID</th>
                                         <th className="px-4 py-3 sm:px-6">Title</th>
                                         <th className="px-4 py-3 sm:px-6">Description</th>
-                                        <th className="px-4 py-3 sm:px-6">UID</th>
+                                        <th className="px-4 py-3 sm:px-6">Customer</th>
                                         <th className="px-4 py-3 sm:px-6">Status</th>
                                         <th className="px-4 py-3 sm:px-6">Priority</th>
                                         <th className="px-4 py-3 sm:px-6">Assigned Engineer</th>
@@ -410,7 +418,7 @@ const ManageTickets = () => {
                                                 )}
                                             </td>
                                             <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[150px]">
-                                                {ticket.uid}
+                                                {ticket.customerName || 'Unknown User'}
                                             </td>
                                             <td className="px-4 py-4 sm:px-6">
                                                 {editingTicketId === ticket._id ? (
@@ -469,7 +477,7 @@ const ManageTickets = () => {
                                                         ))}
                                                     </select>
                                                 ) : (
-                                                    ticket.assignedSupportEngineer || 'Unassigned'
+                                                    ticket.engineerName || 'Unassigned'
                                                 )}
                                             </td>
                                             <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[150px]">

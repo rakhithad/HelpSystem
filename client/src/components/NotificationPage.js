@@ -98,7 +98,7 @@ const NotificationPage = () => {
                                         </h2>
                                         <p className="text-xs sm:text-sm text-gray-300 mt-1">
                                             <span className="font-medium text-white">Triggered by:</span>{' '}
-                                            {note.triggeredBy}
+                                            {note.senderName || 'Unknown User'}
                                         </p>
                                         {note.reason && (
                                             <p className="text-xs sm:text-sm text-pink-300 mt-1 line-clamp-2">
@@ -108,7 +108,7 @@ const NotificationPage = () => {
                                         )}
                                     </div>
                                     <div className="text-xs sm:text-sm text-gray-400 sm:text-right shrink-0">
-                                        {new Date(note.timestamp).toLocaleString()}
+                                        {new Date(note.createdAt).toLocaleString()}
                                     </div>
                                 </div>
                             </div>

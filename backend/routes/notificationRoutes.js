@@ -6,11 +6,13 @@ const authenticateToken = require('../middleware/authenticateToken');
 
 router.get('/', authenticateToken, async (req, res) => {
     try {
-      const notifications = await Notification.find({ receiverUid: req.user.uid }).sort({ createdAt: -1 });
-      res.json(notifications);
+        const notifications = await Notification.find({ receiverUid: req.user.uid })
+            .sort({ createdAt: -1 })
+            .select('receiverUid receiverName senderUid senderName ticketId message reason createdAt');
+        res.json(notifications);
     } catch (err) {
-      res.status(500).json({ message: 'Failed to fetch notifications', error: err.message });
+        res.status(500).json({ message: 'Failed to fetch notifications', error: err.message });
     }
-  });
+});
 
   module.exports = router;
