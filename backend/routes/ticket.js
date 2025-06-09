@@ -567,14 +567,38 @@ router.post('/review/:ticketId', authenticateToken, async (req, res) => {
     }
 });
 
-
 // Fetch all reviews
 router.get('/reviews', async (req, res) => {
     try {
-        const reviews = await Ticket.find(
-            { review: { $exists: true }, rating: { $exists: true } }, // Fetch only tickets with reviews and ratings
-            { review: 1, rating: 1, title: 1, uid: 1 } // Include specific fields
+        // Fetch tickets with reviews and ratings
+        const tickets = await Ticket.find(
+            { review: { $exists: true, $ne: null }, rating: { $exists: true, $ne: null } },
+            { review: 1, rating: 1, title: 1, uid: 1 }
         );
+
+        // Get unique uids from tickets
+        const uids = [...new Set(tickets.map(ticket => ticket.uid))];
+
+        // Fetch users corresponding to uids
+        const users = await User.find(
+            { uid: { $in: uids } },
+            { uid: 1, firstName: 1 }
+        );
+
+        // Create a map of uid to firstName
+        const userMap = users.reduce((map, user) => {
+            map[user.uid] = user.firstName || 'Unknown';
+            return map;
+        }, {});
+
+        // Transform tickets to include firstName instead of uid
+        const reviews = tickets.map(ticket => ({
+            _id: ticket._id,
+            title: ticket.title,
+            review: ticket.review,
+            rating: ticket.rating,
+            firstName: userMap[ticket.uid] || 'Unknown'
+        }));
 
         res.json(reviews);
     } catch (err) {
@@ -582,6 +606,7 @@ router.get('/reviews', async (req, res) => {
         res.status(500).json({ message: 'Failed to fetch reviews' });
     }
 });
+
 
 
 router.get('/tickets-by-status-with-company', authenticateToken, async (req, res) => {

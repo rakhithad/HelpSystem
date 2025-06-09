@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
-import { FaSpinner, FaBars, FaHome, FaUser, FaPlus } from 'react-icons/fa';
+import { FaSpinner, FaBars, FaHome, FaUser, FaPlus, FaEdit, FaTrash } from 'react-icons/fa';
 import Sidebar from './Sidebar';
 
 const ManageUsers = () => {
@@ -419,7 +419,7 @@ const ManageUsers = () => {
                                                         className="px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-300"
                                                         onClick={() => handleEdit(user)}
                                                     >
-                                                        Edit
+                                                        <FaEdit className="w-5 h-5" />
                                                     </button>
                                                 )}
                                                 {userRole === 'admin' && (
@@ -427,7 +427,7 @@ const ManageUsers = () => {
                                                         className="px-3 py-1 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-lg hover:from-red-700 hover:to-pink-700 transition-all duration-300"
                                                         onClick={() => handleDelete(user._id)}
                                                     >
-                                                        Delete
+                                                        <FaTrash className="w-5 h-5" />
                                                     </button>
                                                 )}
                                             </td>

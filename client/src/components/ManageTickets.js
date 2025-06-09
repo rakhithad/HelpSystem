@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { FaSpinner, FaBars, FaHome, FaUser, FaPlus } from 'react-icons/fa';
+import { FaSpinner, FaBars, FaHome, FaUser, FaPlus, FaEdit, FaTrash } from 'react-icons/fa';
 import Sidebar from './Sidebar';
 
 const ManageTickets = () => {
@@ -488,7 +488,7 @@ const ManageTickets = () => {
                                                     onClick={() => toggleEditMode(ticket._id)}
                                                     className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-300"
                                                 >
-                                                    {editingTicketId === ticket._id ? 'Save' : 'Edit'}
+                                                    {editingTicketId === ticket._id ? 'Save' : <FaEdit className="w-5 h-5" />}
                                                 </button>
                                                 {(userRole === 'admin' ||
                                                     (userRole === 'customer' && ticket.uid === userUid)) && (
@@ -496,7 +496,7 @@ const ManageTickets = () => {
                                                         onClick={() => handleDeleteTicket(ticket._id)}
                                                         className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-300"
                                                     >
-                                                        Delete
+                                                        <FaTrash className="w-5 h-5" />
                                                     </button>
                                                 )}
                                                 {userRole === 'customer' && ticket.status === 'done' && (

@@ -119,7 +119,7 @@ const ViewReviewsPage = () => {
                     >
                       <h3 className="text-lg font-semibold text-gray-200 truncate">{review.title}</h3>
                       <p className="text-sm text-gray-300 mb-2">
-                        Customer: {review.uid || 'Unknown'}
+                        Customer: {review.firstName || 'Unknown'}
                       </p>
                       <p className="text-gray-200 mb-4 line-clamp-3">{review.review}</p>
                       <p className="text-yellow-400 font-bold">{renderStars(review.rating)}</p>
