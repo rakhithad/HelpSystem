@@ -8,6 +8,7 @@ const Notification = require('../models/notification');
 
 const router = express.Router();
 
+// Create a new ticket
 router.post('/', authenticateToken, async (req, res) => {
     try {
         const { title, description, priority, customerUid, assignedSupportEngineer } = req.body;
@@ -31,19 +32,16 @@ router.post('/', authenticateToken, async (req, res) => {
 
         // Validate priority based on role
         if (userRole === 'customer') {
-            // Customers get default priority of 1
-            finalPriority = 1;
+            finalPriority = 'medium';
         } else {
-            // Admins and support engineers must provide priority
             if (!priority) {
                 return res.status(400).json({ message: 'Priority is required for admins and support engineers' });
             }
-            // Ensure priority is a number between 1 and 5
-            const priorityNum = parseInt(priority, 10);
-            if (isNaN(priorityNum) || priorityNum < 1 || priorityNum > 5) {
-                return res.status(400).json({ message: 'Priority must be a number between 1 and 5' });
+            const validPriorities = ['low', 'medium', 'high'];
+            if (!validPriorities.includes(priority.toLowerCase())) {
+                return res.status(400).json({ message: 'Priority must be one of: low, medium, high' });
             }
-            finalPriority = priorityNum;
+            finalPriority = priority.toLowerCase();
         }
 
         let finalCustomerUid;
@@ -129,7 +127,6 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 });
 
-
 // View all tickets
 router.get('/view-tickets', authenticateToken, async (req, res) => {
     try {
@@ -143,74 +140,111 @@ router.get('/view-tickets', authenticateToken, async (req, res) => {
 
         if (user.role === 'customer') {
             // Customers can only see their own tickets (not deleted)
-            tickets = await Ticket.find({ uid: user.uid, status: { $ne: 'inactive' } });
-        } else if (user.role === 'support') {
+            tickets = await Ticket.find({ 
+                uid: user.uid, 
+                status: { $nin: ['inactive', 'deleted'] } 
+            }).select('_id tid title description status priority uid assignedSupportEngineer createdAt');
+        } else if (user.role === 'support_engineer') {
             // Support engineers can only see tickets assigned to them (not deleted)
-            tickets = await Ticket.find({ assignedTo: user.uid, status: { $ne: 'inactive' } });
+            tickets = await Ticket.find({ 
+                assignedSupportEngineer: user.uid, 
+                status: { $nin: ['inactive', 'deleted'] } 
+            }).select('_id tid title description status priority uid assignedSupportEngineer createdAt');
         } else if (user.role === 'admin') {
             // Admins can see all tickets (not deleted)
-            tickets = await Ticket.find({ status: { $ne: 'inactive' } });
+            tickets = await Ticket.find({ 
+                status: { $nin: ['inactive', 'deleted'] } 
+            }).select('_id tid title description status priority uid assignedSupportEngineer createdAt');
         } else {
             return res.status(403).json({ message: 'Invalid role' });
         }
 
+        // Ensure priority is lowercase for consistency
+        tickets = tickets.map(ticket => ({
+            ...ticket.toObject(),
+            priority: ticket.priority ? ticket.priority.toLowerCase() : 'medium'
+        }));
+
         return res.json({ tickets, role: user.role });
 
     } catch (error) {
-        console.error(error);
+        console.error('Error fetching tickets:', error);
         return res.status(500).json({ message: 'Server Error', error: error.message });
     }
 });
 
+// Update a ticket
 router.put('/update-ticket/:id', authenticateToken, async (req, res) => {
-  const { status, priority, assignedSupportEngineer } = req.body;
-  const uid = req.user.uid;
-  const role = req.user.role;
+    const { status, priority, assignedSupportEngineer, description } = req.body;
+    const uid = req.user.uid;
+    const role = req.user.role;
 
-  try {
-    const ticket = await Ticket.findById(req.params.id);
-    if (!ticket) {
-      return res.status(404).json({ message: 'Ticket not found' });
-    }
+    try {
+        const ticket = await Ticket.findById(req.params.id);
+        if (!ticket) {
+            return res.status(404).json({ message: 'Ticket not found' });
+        }
 
-    // Authorization checks
-    if (role === 'customer' && ticket.uid !== uid) {
-      return res.status(403).json({ message: 'You can only update your own tickets' });
-    }
-    if (role === 'support_engineer' && ticket.assignedSupportEngineer !== uid) {
-      return res.status(403).json({ message: 'You can only update tickets assigned to you' });
-    }
+        // Authorization checks
+        if (role === 'customer' && ticket.uid !== uid) {
+            return res.status(403).json({ message: 'You can only update your own tickets' });
+        }
+        if (role === 'support_engineer' && ticket.assignedSupportEngineer !== uid) {
+            return res.status(403).json({ message: 'You can only update tickets assigned to you' });
+        }
 
-    // Validate updates
-    const updates = {};
-    if (status && ['not started', 'in progress', 'stuck', 'done'].includes(status)) {
-      updates.status = status;
-    }
-    if (priority && Number.isInteger(Number(priority)) && priority >= 1 && priority <= 5) {
-      updates.priority = Number(priority);
-    }
-    if (role === 'admin' && assignedSupportEngineer !== undefined) {
-      // Allow null to unassign or a valid UID
-      if (assignedSupportEngineer === null || (typeof assignedSupportEngineer === 'string' && assignedSupportEngineer.length > 0)) {
-        updates.assignedSupportEngineer = assignedSupportEngineer;
-      }
-    }
+        // Validate updates
+        const updates = {};
+        if (status && ['not started', 'in progress', 'stuck', 'done'].includes(status)) {
+            updates.status = status;
+        }
+        if (priority) {
+            const validPriorities = ['low', 'medium', 'high'];
+            if (!validPriorities.includes(priority.toLowerCase())) {
+                return res.status(400).json({ message: 'Priority must be one of: low, medium, high' });
+            }
+            updates.priority = priority.toLowerCase();
+        }
+        if (description && typeof description === 'string' && description.trim().length > 0) {
+            updates.description = description.trim();
+        }
+        if (role === 'admin' && assignedSupportEngineer !== undefined) {
+            if (assignedSupportEngineer === null || (typeof assignedSupportEngineer === 'string' && assignedSupportEngineer.length > 0)) {
+                if (assignedSupportEngineer) {
+                    const engineer = await User.findOne({ uid: assignedSupportEngineer, role: 'support_engineer' });
+                    if (!engineer) {
+                        return res.status(400).json({ message: 'Invalid support engineer UID' });
+                    }
+                }
+                updates.assignedSupportEngineer = assignedSupportEngineer;
+            }
+        }
 
-    if (Object.keys(updates).length === 0) {
-      return res.status(400).json({ message: 'No valid updates provided' });
+        if (Object.keys(updates).length === 0) {
+            return res.status(400).json({ message: 'No valid updates provided' });
+        }
+
+        // Update ticket
+        Object.assign(ticket, updates);
+        await ticket.save();
+
+        // Ensure priority is lowercase in response
+        const responseTicket = {
+            ...ticket.toObject(),
+            priority: ticket.priority ? ticket.priority.toLowerCase() : 'medium'
+        };
+
+        res.status(200).json(responseTicket);
+    } catch (error) {
+        console.error('Error updating ticket:', error);
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ message: 'Invalid ticket data', details: error.message });
+        }
+        res.status(500).json({ message: 'Failed to update ticket', error: error.message });
     }
-
-    // Update ticket
-    Object.assign(ticket, updates);
-    await ticket.save();
-
-    res.status(200).json(ticket);
-  } catch (error) {
-    console.error('Error updating ticket:', error);
-    res.status(500).json({ message: 'Failed to update ticket', error: error.message });
-  }
 });
 
+// Delete a ticket
 router.delete('/delete-ticket/:id', authenticateToken, async (req, res) => {
     const { reason } = req.body;
     const uid = req.user.uid;
@@ -312,13 +346,20 @@ router.delete('/delete-ticket/:id', authenticateToken, async (req, res) => {
             await Notification.insertMany(notifications);
         }
 
-        res.status(200).json({ message: 'Ticket marked as deleted and notifications sent.', ticket });
+        // Ensure priority is lowercase in response
+        const responseTicket = {
+            ...ticket.toObject(),
+            priority: ticket.priority ? ticket.priority.toLowerCase() : 'medium'
+        };
+
+        res.status(200).json({ message: 'Ticket marked as deleted and notifications sent.', ticket: responseTicket });
     } catch (error) {
         console.error('Error deleting ticket:', error);
         res.status(500).json({ message: 'Failed to delete ticket', error: error.message });
     }
 });
 
+// Get ticket counts
 router.get('/ticket-counts', authenticateToken, async (req, res) => {
     try {
         const { role, uid } = req.user;
@@ -331,7 +372,6 @@ router.get('/ticket-counts', authenticateToken, async (req, res) => {
         } else if (role === 'support_engineer') {
             baseQuery = { assignedSupportEngineer: uid };
         }
-        // Admin sees all tickets (no filter applied)
 
         // Count tickets by status with role-based filtering
         const openTickets = await Ticket.countDocuments({ 
@@ -349,7 +389,7 @@ router.get('/ticket-counts', authenticateToken, async (req, res) => {
             status: 'done' 
         });
         
-        // Unassigned tickets logic - NO role-based filtering for customers/support engineers
+        // Unassigned tickets logic
         let unassignedQuery = {
             $or: [
                 { assignedSupportEngineer: null },
@@ -359,8 +399,6 @@ router.get('/ticket-counts', authenticateToken, async (req, res) => {
             ]
         };
         
-        // Only customers should see their own unassigned tickets
-        // Support engineers and admins should see ALL unassigned tickets
         if (role === 'customer') {
             unassignedQuery.uid = uid;
         }
@@ -380,39 +418,50 @@ router.get('/ticket-counts', authenticateToken, async (req, res) => {
     }
 });
 
-
-
-// API to fetch tickets by type
-router.get('/tickets-by-status', async (req, res) => {
-    const { type } = req.query;
-    const userRole = req.headers.role; // Get role from headers
-    const userId = req.headers.uid;   // Get UID from headers
-
-    let filter = {};
-
-    // Define filter based on ticket type
-    if (type === 'open') filter.status = 'not started';
-    if (type === 'pending') filter.status = 'in progress';
-    if (type === 'solved') filter.status = 'done';
-    if (type === 'unassigned') filter.assignedSupportEngineer = 'Not Assigned';
-
+// Get tickets by status
+router.get('/tickets-by-status', authenticateToken, async (req, res) => {
     try {
-        // Additional filtering based on user role
-        if (userRole === 'customer') {
-            filter.uid = userId; // Filter tickets created by this user
-        } else if (userRole === 'supportEngineer') {
-            filter.assignedSupportEngineer = userId; // Filter tickets assigned to this user
+        const { type } = req.query;
+        const { role, uid } = req.user;
+
+        if (!type) {
+            return res.status(400).json({ message: 'Ticket type is required' });
         }
 
-        const tickets = await Ticket.find(filter);
-        res.status(200).json(tickets);
+        let filter = {};
+        if (type === 'open') filter.status = 'not started';
+        else if (type === 'pending') filter.status = 'in progress';
+        else if (type === 'solved') filter.status = 'done';
+        else if (type === 'unassigned') filter.assignedSupportEngineer = { $in: [null, undefined, 'Not Assigned'] };
+        else {
+            return res.status(400).json({ message: 'Invalid ticket type' });
+        }
+
+        // Apply role-based filtering
+        if (role === 'customer') {
+            filter.uid = uid;
+        } else if (role === 'support_engineer') {
+            if (type !== 'unassigned') {
+                filter.assignedSupportEngineer = uid;
+            }
+        }
+
+        const tickets = await Ticket.find(filter).select('_id tid title description status priority uid assignedSupportEngineer createdAt');
+
+        // Format tickets
+        const formattedTickets = tickets.map(ticket => ({
+            ...ticket.toObject(),
+            priority: ticket.priority ? ticket.priority.toLowerCase() : 'medium'
+        }));
+
+        res.status(200).json(formattedTickets);
     } catch (error) {
         console.error('Error fetching tickets:', error);
-        res.status(500).json({ message: 'Failed to fetch tickets' });
+        res.status(500).json({ message: 'Failed to fetch tickets', error: error.message });
     }
 });
 
-
+// Get report data
 router.get('/report', authenticateToken, async (req, res) => {
     try {
         const pipeline = [
@@ -428,7 +477,7 @@ router.get('/report', authenticateToken, async (req, res) => {
             {
                 $lookup: {
                     from: 'companies',
-                    localField: 'userDetails.companyId',
+                    localField: 'userDetails.firstName',
                     foreignField: 'companyId',
                     as: 'companyDetails'
                 }
@@ -444,22 +493,29 @@ router.get('/report', authenticateToken, async (req, res) => {
             },
             { $unwind: { path: '$engineerDetails', preserveNullAndEmptyArrays: true } },
             {
+                $match: {
+                    status: { $nin: ['inactive', 'deleted'] }
+                }
+            },
+            {
                 $project: {
                     tid: 1,
                     title: 1,
                     description: 1,
                     status: 1,
-                    priority: 1,
+                    priority: { $toLower: { $ifNull: ['$priority', 'medium'] } },
                     createdAt: 1,
                     updatedAt: 1,
-                    resolvedAt: 1,
                     customer: {
                         uid: '$userDetails.uid',
                         name: { $concat: ['$userDetails.firstName', ' ', '$userDetails.lastName'] },
                         phoneNumber: '$userDetails.phoneNumber',
                         location: '$userDetails.location'
                     },
-                    company: '$companyDetails',
+                    company: {
+                        companyId: '$companyDetails.companyId',
+                        name: '$companyDetails.name'
+                    },
                     assignedSupportEngineer: {
                         uid: '$engineerDetails.uid',
                         name: { $concat: ['$engineerDetails.firstName', ' ', '$engineerDetails.lastName'] }
@@ -475,13 +531,13 @@ router.get('/report', authenticateToken, async (req, res) => {
         // Calculate metrics
         const allTicketsCount = reportData.length;
 
-        const closedTickets = reportData.filter(ticket => ticket.status === 'closed' && ticket.resolvedAt);
+        const closedTickets = reportData.filter(ticket => ticket.status === 'done');
         const averageTime = closedTickets.length
             ? closedTickets.reduce((acc, ticket) => {
                   const createdAt = new Date(ticket.createdAt);
-                  const resolvedAt = new Date(ticket.resolvedAt);
-                  return acc + (resolvedAt - createdAt);
-              }, 0) / (closedTickets.length * 1000 * 60 * 60) // Convert to hours
+                  const updatedAt = new Date(ticket.updatedAt);
+                  return acc + (updatedAt - createdAt);
+              }, 0) / (closedTickets.length * 1000 * 60 * 60)
             : 0;
 
         const ticketsByStatus = reportData.reduce((acc, ticket) => {
@@ -502,7 +558,7 @@ router.get('/report', authenticateToken, async (req, res) => {
         }, {});
 
         const ticketsByPriority = reportData.reduce((acc, ticket) => {
-            const priority = ticket.priority.toString();
+            const priority = ticket.priority || 'medium';
             acc[priority] = (acc[priority] || 0) + 1;
             return acc;
         }, {});
@@ -527,7 +583,7 @@ router.get('/report', authenticateToken, async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching report:', error);
-        res.status(500).json({ message: 'Error generating report' });
+        res.status(500).json({ message: 'Error generating report', error: error.message });
     }
 });
 
@@ -535,10 +591,9 @@ router.get('/report', authenticateToken, async (req, res) => {
 router.post('/review/:ticketId', authenticateToken, async (req, res) => {
     const { ticketId } = req.params;
     const { review, rating } = req.body;
-    const userId = req.user.uid; // Assuming you're using middleware to extract user info from the token
+    const userId = req.user.uid;
 
     try {
-        // Find the ticket
         const ticket = await Ticket.findOne({ _id: ticketId, uid: userId });
 
         if (!ticket) {
@@ -549,18 +604,22 @@ router.post('/review/:ticketId', authenticateToken, async (req, res) => {
             return res.status(400).json({ message: 'Cannot review a ticket that is not completed' });
         }
 
-        // Check if the ticket has already been reviewed
         if (ticket.reviewed) {
             return res.status(400).json({ message: 'This ticket has already been reviewed' });
         }
 
-        // Add the review, rating, and mark the ticket as reviewed
         ticket.review = review;
         ticket.rating = rating;
-        ticket.reviewed = true; // Mark the ticket as reviewed
+        ticket.reviewed = true;
         await ticket.save();
 
-        res.json({ message: 'Review submitted successfully', ticket });
+        // Ensure priority is lowercase in response
+        const responseTicket = {
+            ...ticket.toObject(),
+            priority: ticket.priority ? ticket.priority.toLowerCase() : 'medium'
+        };
+
+        res.json({ message: 'Review submitted successfully', ticket: responseTicket });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Failed to submit review' });
@@ -570,34 +629,30 @@ router.post('/review/:ticketId', authenticateToken, async (req, res) => {
 // Fetch all reviews
 router.get('/reviews', async (req, res) => {
     try {
-        // Fetch tickets with reviews and ratings
         const tickets = await Ticket.find(
             { review: { $exists: true, $ne: null }, rating: { $exists: true, $ne: null } },
-            { review: 1, rating: 1, title: 1, uid: 1 }
+            { review: 1, rating: 1, title: 1, uid: 1, priority: 1 }
         );
 
-        // Get unique uids from tickets
         const uids = [...new Set(tickets.map(ticket => ticket.uid))];
 
-        // Fetch users corresponding to uids
         const users = await User.find(
             { uid: { $in: uids } },
             { uid: 1, firstName: 1 }
         );
 
-        // Create a map of uid to firstName
         const userMap = users.reduce((map, user) => {
             map[user.uid] = user.firstName || 'Unknown';
             return map;
         }, {});
 
-        // Transform tickets to include firstName instead of uid
         const reviews = tickets.map(ticket => ({
             _id: ticket._id,
             title: ticket.title,
             review: ticket.review,
             rating: ticket.rating,
-            firstName: userMap[ticket.uid] || 'Unknown'
+            firstName: userMap[ticket.uid] || 'Unknown',
+            priority: ticket.priority ? ticket.priority.toLowerCase() : 'medium'
         }));
 
         res.json(reviews);
@@ -607,52 +662,48 @@ router.get('/reviews', async (req, res) => {
     }
 });
 
-
-
+// Get tickets by status with company
 router.get('/tickets-by-status-with-company', authenticateToken, async (req, res) => {
     try {
         const { type } = req.query;
         const { role, uid } = req.user;
 
-        let query = {};
-        
-        // Define status/type mapping
-        if (type === 'open') {
-            query.status = 'not started';
-        } else if (type === 'pending') {
-            query.status = 'in progress';
-        } else if (type === 'solved') {
-            query.status = 'done';
-        } else if (type === 'unassigned') {
-            query.$or = [
-                { assignedSupportEngineer: null },
-                { assignedSupportEngineer: 'Not Assigned' },
-                { assignedSupportEngineer: '' },
-                { assignedSupportEngineer: { $exists: false } }
-            ];
-        } else {
-            return res.status(400).json({ message: 'Invalid ticket type' });
+        if (!type) {
+            return res.status(400).json({ message: 'Ticket type is required' });
         }
 
-        // Apply role-based filtering
+        let query = {};
+
+        const validTypes = {
+            'open': 'not started',
+            'pending': 'in progress',
+            'solved': 'done',
+            'unassigned': {
+                $or: [
+                    { assignedSupportEngineer: null },
+                    { assignedSupportEngineer: '' },
+                    { assignedSupportEngineer: { $exists: false } }
+                ]
+            }
+        };
+
+        if (!Object.prototype.hasOwnProperty.call(validTypes, type)) {
+            return res.status(400).json({ message: 'Invalid ticket type. Valid types: open, pending, solved, unassigned' });
+        }
+
+        query = typeof validTypes[type] === 'object' ? validTypes[type] : { status: validTypes[type] };
+
         if (role === 'customer') {
-            // Customers see only their own tickets for all types
             query.uid = uid;
         } else if (role === 'support_engineer') {
-            if (type === 'unassigned') {
-                // Support engineers see ALL unassigned tickets (no additional filter)
-                // The unassigned query is already applied above
-            } else {
-                // For assigned tickets, support engineers see only tickets assigned to them
+            if (type !== 'unassigned') {
                 query.assignedSupportEngineer = uid;
             }
         }
-        // Admin sees all tickets (no additional filtering)
 
         console.log('Final query for tickets:', JSON.stringify(query, null, 2));
         console.log('User role:', role, 'User ID:', uid, 'Type:', type);
 
-        // Fetch tickets with user and company details
         const tickets = await Ticket.aggregate([
             { $match: query },
             {
@@ -660,103 +711,111 @@ router.get('/tickets-by-status-with-company', authenticateToken, async (req, res
                     from: 'users',
                     localField: 'uid',
                     foreignField: 'uid',
-                    as: 'user',
+                    as: 'userDetails',
                 },
             },
-            { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+            { $unwind: { path: '$userDetails', preserveNullAndEmptyArrays: true } },
             {
                 $lookup: {
                     from: 'companies',
-                    localField: 'user.companyId',
+                    localField: 'userDetails.companyId',
                     foreignField: 'companyId',
-                    as: 'company',
+                    as: 'companyDetails',
                 },
             },
-            { $unwind: { path: '$company', preserveNullAndEmptyArrays: true } },
+            { $unwind: { path: '$companyDetails', preserveNullAndEmptyArrays: true } },
             {
                 $project: {
                     tid: 1,
                     title: 1,
-                    priority: 1,
+                    priority: { $toLower: { $ifNull: ['$priority', 'medium'] } },
                     status: 1,
                     assignedSupportEngineer: 1,
                     createdAt: 1,
                     uid: 1,
-                    companyName: '$company.name',
-                    customerName: '$user.name',
-                    customerEmail: '$user.email'
+                    companyName: { $ifNull: ['$companyDetails.name', 'Unknown'] },
+                    customerName: {
+                        $concat: [
+                            { $ifNull: ['$userDetails.firstName', ''] },
+                            { $cond: [{ $eq: ['$userDetails.firstName', ''] }, '', ' '] },
+                            { $ifNull: ['$userDetails.lastName', ''] },
+                            { $cond: [
+                                {
+                                    $and: [
+                                        { $eq: ['$userDetails.firstName', ''] },
+                                        { $eq: ['$userDetails.lastName', ''] },
+                                    ],
+                                },
+                                'Unknown',
+                                '',
+                            ]},
+                        ],
+                    },
+                    customerEmail: '$userDetails.email'
                 },
             },
             { $sort: { createdAt: -1 } }
         ]);
 
         console.log(`Found ${tickets.length} tickets for type: ${type}`);
-        
+
         res.status(200).json(tickets);
-        
+
     } catch (error) {
         console.error('Error fetching tickets with company:', {
             error: error.message,
-            userId: req.user?.uid,
+            userUid: req.user?.uid,
             role: req.user?.role,
             query: req.query,
             stack: error.stack
         });
-        res.status(500).json({ message: 'Failed to fetch tickets' });
+        res.status(500).json({ message: 'Failed to fetch tickets', error: error.message });
     }
 });
 
-
+// View tickets with company
 router.get('/view-tickets-with-company', authenticateToken, async (req, res) => {
     try {
         const { role, uid } = req.user;
 
-        // Define query based on role
         let query = {};
         if (role === 'customer') {
             query.uid = uid;
         } else if (role === 'support_engineer') {
             query.assignedSupportEngineer = uid;
-        } // Admins get all tickets
+        }
 
-        // Exclude inactive and deleted tickets
         query.status = { $nin: ['inactive', 'deleted'] };
 
-        // Fetch tickets with user, engineer, and company details
         const tickets = await Ticket.aggregate([
             { $match: query },
-            // Lookup for customer (uid)
             {
                 $lookup: {
                     from: 'users',
                     localField: 'uid',
                     foreignField: 'uid',
-                    as: 'customer',
+                    as: 'customerDetails',
                 },
             },
-            { $unwind: '$customer' },
-            // Lookup for assigned support engineer
+            { $unwind: { path: '$customerDetails', preserveNullAndEmptyArrays: true } },
             {
                 $lookup: {
                     from: 'users',
                     localField: 'assignedSupportEngineer',
                     foreignField: 'uid',
-                    as: 'engineer',
+                    as: 'engineerDetails',
                 },
             },
-            // Unwind engineer, preserving null for unassigned engineers
-            { $unwind: { path: '$engineer', preserveNullAndEmptyArrays: true } },
-            // Lookup for company
+            { $unwind: { path: '$engineerDetails', preserveNullAndEmptyArrays: true } },
             {
                 $lookup: {
                     from: 'companies',
-                    localField: 'customer.companyId',
+                    localField: 'customerDetails.companyId',
                     foreignField: 'companyId',
-                    as: 'company',
+                    as: 'companyDetails',
                 },
             },
-            { $unwind: { path: '$company', preserveNullAndEmptyArrays: true } },
-            // Project the desired fields
+            { $unwind: { path: '$companyDetails', preserveNullAndEmptyArrays: true } },
             {
                 $project: {
                     _id: 1,
@@ -765,23 +824,23 @@ router.get('/view-tickets-with-company', authenticateToken, async (req, res) => 
                     description: 1,
                     uid: 1,
                     status: 1,
-                    priority: 1,
+                    priority: { $toLower: { $ifNull: ['$priority', 'medium'] } },
                     assignedSupportEngineer: 1,
                     createdAt: 1,
-                    companyName: { $ifNull: ['$company.name', 'No Company'] },
+                    companyName: { $ifNull: ['$companyDetails.name', 'Unknown'] },
                     customerName: {
                         $concat: [
-                            { $ifNull: ['$customer.firstName', ''] },
-                            { $cond: [{ $eq: ['$customer.firstName', ''] }, '', ' '] },
-                            { $ifNull: ['$customer.lastName', ''] },
+                            { $ifNull: ['$customerDetails.firstName', ''] },
+                            { $cond: [{ $eq: ['$customerDetails.firstName', ''] }, '', ' '] },
+                            { $ifNull: ['$customerDetails.lastName', ''] },
                             { $cond: [
                                 {
                                     $and: [
-                                        { $eq: ['$customer.firstName', ''] },
-                                        { $eq: ['$customer.lastName', ''] },
+                                        { $eq: ['$customerDetails.firstName', ''] },
+                                        { $eq: ['$customerDetails.lastName', ''] },
                                     ],
                                 },
-                                'Unknown User',
+                                'Unknown',
                                 '',
                             ]},
                         ],
@@ -792,17 +851,17 @@ router.get('/view-tickets-with-company', authenticateToken, async (req, res) => 
                             'Unassigned',
                             {
                                 $concat: [
-                                    { $ifNull: ['$engineer.firstName', ''] },
-                                    { $cond: [{ $eq: ['$engineer.firstName', ''] }, '', ' '] },
-                                    { $ifNull: ['$engineer.lastName', ''] },
+                                    { $ifNull: ['$engineerDetails.firstName', ''] },
+                                    { $cond: [{ $eq: ['$engineerDetails.firstName', ''] }, '', ' '] },
+                                    { $ifNull: ['$engineerDetails.lastName', ''] },
                                     { $cond: [
                                         {
                                             $and: [
-                                                { $eq: ['$engineer.firstName', ''] },
-                                                { $eq: ['$engineer.lastName', ''] },
+                                                { $eq: ['$engineerDetails.firstName', ''] },
+                                                { $eq: ['$engineerDetails.lastName', ''] },
                                             ],
                                         },
-                                        'Unknown User',
+                                        'Unknown',
                                         '',
                                     ]},
                                 ],
@@ -811,24 +870,18 @@ router.get('/view-tickets-with-company', authenticateToken, async (req, res) => 
                     },
                 },
             },
+            { $sort: { createdAt: -1 } }
         ]);
 
         res.status(200).json({ tickets, role });
     } catch (error) {
         console.error('Error fetching tickets with company:', {
             error: error.message,
-            userId: req.user?.id,
+            userUid: req.user?.uid,
             role: req.user?.role,
         });
-        res.status(500).json({ message: 'Failed to fetch tickets' });
+        res.status(500).json({ message: 'Failed to fetch tickets', error: error.message });
     }
 });
 
-
-
-
 module.exports = router;
-
-
-
-

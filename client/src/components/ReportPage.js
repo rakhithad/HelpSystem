@@ -42,6 +42,14 @@ const ReportPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const navigate = useNavigate();
 
+    // Redirect to login if no token
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        if (!token) {
+            navigate('/login');
+        }
+    }, [navigate]);
+
     // Close sidebar when clicking outside on mobile
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -72,10 +80,10 @@ const ReportPage = () => {
         };
     }, [isSidebarOpen, isModalOpen]);
 
-    // Fetch report data on component mount
+    // Fetch report data
     useEffect(() => {
         fetchReportData();
-    }, [navigate]);
+    }, []);
 
     const fetchReportData = async () => {
         setIsLoading(true);
@@ -83,22 +91,27 @@ const ReportPage = () => {
         setSuccess(null);
         try {
             const token = localStorage.getItem("token");
-            if (!token) {
-                navigate('/login');
-                return;
-            }
             const response = await axios.get(
                 `${process.env.REACT_APP_BACKEND_BASEURL}/tickets/report`,
                 {
                     headers: { Authorization: `Bearer ${token}` }
                 }
             );
-            setMetrics(response.data);
-            setFilteredTickets(response.data.reportData || []);
-            setSuccess("Report data loaded successfully!");
+            if (response.data && Array.isArray(response.data.reportData)) {
+                setMetrics(response.data);
+                setFilteredTickets(response.data.reportData);
+                setSuccess("Report data loaded successfully!");
+            } else {
+                throw new Error("Invalid response format");
+            }
         } catch (err) {
             console.error("Error fetching report data:", err);
-            setError("Failed to fetch report data: " + (err.response?.data?.message || err.message));
+            const errorMessage = err.response?.data?.message || "Failed to fetch report data.";
+            setError(errorMessage);
+            if (err.response?.status === 401) {
+                localStorage.removeItem('token');
+                navigate('/login');
+            }
         } finally {
             setIsLoading(false);
         }
@@ -130,7 +143,7 @@ const ReportPage = () => {
     };
 
     const applyFilters = (filters, mainFilterType, companyId, engineerName, customDateRange = null) => {
-        let filtered = metrics.reportData || [];
+        let filtered = [...(metrics.reportData || [])];
         if (mainFilterType === "company" && companyId) {
             filtered = filtered.filter(ticket => ticket.company?.companyId === companyId);
         } else if (mainFilterType === "engineer" && engineerName) {
@@ -154,7 +167,7 @@ const ReportPage = () => {
             filtered = filtered.filter(ticket => ticket.customer?.name === filters.customer);
         }
         if (filters.priority) {
-            filtered = filtered.filter(ticket => ticket.priority === parseInt(filters.priority));
+            filtered = filtered.filter(ticket => ticket.priority.toLowerCase() === filters.priority.toLowerCase());
         }
         if (filters.rating) {
             filtered = filtered.filter(ticket => ticket.rating === parseInt(filters.rating));
@@ -195,16 +208,17 @@ const ReportPage = () => {
         setFilteredTickets(metrics.reportData || []);
     };
 
-    const uniqueCompanies = (metrics.reportData || [])
-        .map(ticket => ticket.company)
-        .filter(company => company && company.companyId)
-        .filter((company, index, self) => self.findIndex(c => c.companyId === company.companyId) === index);
+    const uniqueCompanies = [...new Set(
+        (metrics.reportData || [])
+            .filter(ticket => ticket.company?.companyId)
+            .map(ticket => JSON.stringify({ companyId: ticket.company.companyId, name: ticket.company.name }))
+    )].map(str => JSON.parse(str));
 
     const uniqueEngineers = [...new Set(
         (metrics.reportData || []).map(ticket => 
             ticket.assignedSupportEngineer?.name || "Not Assigned"
         )
-    )].filter(name => name !== "Not Assigned");
+    )].filter(name => name);
 
     const calculateStats = () => {
         if (!filteredTickets.length) return {};
@@ -227,7 +241,7 @@ const ReportPage = () => {
             return acc;
         }, {});
         const priorityCounts = filteredTickets.reduce((acc, ticket) => {
-            const priority = ticket.priority.toString();
+            const priority = ticket.priority.toLowerCase();
             acc[priority] = (acc[priority] || 0) + 1;
             return acc;
         }, {});
@@ -311,6 +325,32 @@ const ReportPage = () => {
     const closeTicketModal = () => {
         setSelectedTicket(null);
         setIsModalOpen(false);
+    };
+
+    const getPriorityColor = (priority) => {
+        switch (priority.toLowerCase()) {
+            case 'high':
+                return 'bg-red-500 bg-opacity-20 text-red-300';
+            case 'medium':
+                return 'bg-yellow-500 bg-opacity-20 text-yellow-300';
+            case 'low':
+                return 'bg-green-500 bg-opacity-20 text-green-300';
+            default:
+                return 'bg-gray-500 bg-opacity-20 text-gray-300';
+        }
+    };
+
+    const getStatusColor = (status) => {
+        switch (status.toLowerCase()) {
+            case 'open':
+                return 'bg-blue-500 bg-opacity-20 text-blue-300';
+            case 'in-progress':
+                return 'bg-yellow-500 bg-opacity-20 text-yellow-300';
+            case 'closed':
+                return 'bg-green-500 bg-opacity-20 text-green-300';
+            default:
+                return 'bg-gray-500 bg-opacity-20 text-gray-300';
+        }
     };
 
     return (
@@ -431,17 +471,14 @@ const ReportPage = () => {
                                 <div className="bg-gray-900 bg-opacity-50 p-4 rounded-xl">
                                     <h3 className="text-md font-semibold text-gray-200 mb-2">Priority Distribution</h3>
                                     <div className="space-y-2">
-                                        {Object.entries(stats.priorityCounts || {}).sort((a, b) => b[0] - a[0]).map(([priority, count]) => (
+                                        {Object.entries(stats.priorityCounts || {}).map(([priority, count]) => (
                                             <div key={priority} className="flex items-center">
-                                                <div className="w-24 text-sm text-gray-300">Priority {priority}</div>
+                                                <div className="w-24 text-sm text-gray-300">
+                                                    {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                                                </div>
                                                 <div className="flex-1 bg-gray-700 h-4 rounded-full overflow-hidden">
                                                     <div 
-                                                        className={`h-full rounded-full ${
-                                                            priority === "1" ? "bg-gradient-to-r from-green-500 to-emerald-500" : 
-                                                            priority === "2" ? "bg-gradient-to-r from-yellow-500 to-amber-500" : 
-                                                            priority === "3" ? "bg-gradient-to-r from-orange-500 to-red-500" : 
-                                                            "bg-gradient-to-r from-red-500 to-pink-500"
-                                                        }`}
+                                                        className={`h-full rounded-full ${getPriorityColor(priority)}`} 
                                                         style={{ width: `${stats.total ? (count / stats.total) * 100 : 0}%` }}
                                                     ></div>
                                                 </div>
@@ -468,9 +505,9 @@ const ReportPage = () => {
                                 <div>
                                     <label className="block text-sm font-medium text-gray-200 mb-1">Main Filter</label>
                                     <select
+                                        value={mainFilter}
                                         onChange={(e) => handleMainFilterChange(e.target.value)}
                                         className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                        value={mainFilter}
                                     >
                                         <option value="all">All Tickets</option>
                                         <option value="company">Filter by Company</option>
@@ -481,9 +518,9 @@ const ReportPage = () => {
                                     <div>
                                         <label className="block text-sm font-medium text-gray-200 mb-1">Select Company</label>
                                         <select
+                                            value={selectedCompany}
                                             onChange={(e) => handleCompanyChange(e.target.value)}
                                             className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                            value={selectedCompany}
                                         >
                                             <option value="">Select a Company</option>
                                             {uniqueCompanies.map(company => (
@@ -498,12 +535,11 @@ const ReportPage = () => {
                                     <div>
                                         <label className="block text-sm font-medium text-gray-200 mb-1">Select Engineer</label>
                                         <select
+                                            value={selectedEngineer}
                                             onChange={(e) => handleEngineerChange(e.target.value)}
                                             className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                            value={selectedEngineer}
                                         >
                                             <option value="">Select an Engineer</option>
-                                            <option value="Not Assigned">Not Assigned</option>
                                             {uniqueEngineers.map(engineer => (
                                                 <option key={engineer} value={engineer}>
                                                     {engineer}
@@ -533,9 +569,9 @@ const ReportPage = () => {
                                 <div>
                                     <label className="block text-sm font-medium text-gray-200 mb-1">Ticket Status</label>
                                     <select
+                                        value={selectedFilters.status}
                                         onChange={(e) => handleFilterChange('status', e.target.value)}
                                         className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                        value={selectedFilters.status}
                                     >
                                         <option value="">All Statuses</option>
                                         {Object.entries(metrics.ticketsByStatus || {}).map(([status, count]) => (
@@ -548,15 +584,14 @@ const ReportPage = () => {
                                 <div>
                                     <label className="block text-sm font-medium text-gray-200 mb-1">Support Engineer</label>
                                     <select
+                                        value={selectedFilters.engineer}
                                         onChange={(e) => handleFilterChange('engineer', e.target.value)}
                                         className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                        value={selectedFilters.engineer}
                                     >
                                         <option value="">All Engineers</option>
-                                        <option value="Not Assigned">Not Assigned</option>
-                                        {Object.entries(metrics.ticketsByEngineer || {}).map(([engineer, count]) => (
+                                        {uniqueEngineers.map(engineer => (
                                             <option key={engineer} value={engineer}>
-                                                {engineer} ({count})
+                                                {engineer} ({metrics.ticketsByEngineer?.[engineer] || 0})
                                             </option>
                                         ))}
                                     </select>
@@ -564,9 +599,9 @@ const ReportPage = () => {
                                 <div>
                                     <label className="block text-sm font-medium text-gray-200 mb-1">Customer</label>
                                     <select
+                                        value={selectedFilters.customer}
                                         onChange={(e) => handleFilterChange('customer', e.target.value)}
                                         className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                        value={selectedFilters.customer}
                                     >
                                         <option value="">All Customers</option>
                                         {Object.entries(metrics.ticketsByCustomer || {}).map(([customer, count]) => (
@@ -579,24 +614,22 @@ const ReportPage = () => {
                                 <div>
                                     <label className="block text-sm font-medium text-gray-200 mb-1">Priority Level</label>
                                     <select
+                                        value={selectedFilters.priority}
                                         onChange={(e) => handleFilterChange('priority', e.target.value)}
                                         className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                        value={selectedFilters.priority}
                                     >
                                         <option value="">All Priorities</option>
-                                        {Object.entries(metrics.ticketsByPriority || {}).map(([priority, count]) => (
-                                            <option key={priority} value={priority}>
-                                                Priority {priority} ({count})
-                                            </option>
-                                        ))}
+                                        <option value="low">Low</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="high">High</option>
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-200 mb-1">Customer Rating</label>
                                     <select
+                                        value={selectedFilters.rating}
                                         onChange={(e) => handleFilterChange('rating', e.target.value)}
                                         className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                        value={selectedFilters.rating}
                                     >
                                         <option value="">All Ratings</option>
                                         {[1, 2, 3, 4, 5].map(rating => (
@@ -609,60 +642,62 @@ const ReportPage = () => {
                             </div>
                         </div>
                     )}
-                    <div className="overflow-x-auto bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl shadow-lg">
-                        {metrics.reportData.length === 0 && !isLoading ? (
-                            <p className="text-gray-300 p-6 text-center">No tickets available.</p>
-                        ) : filteredTickets.length > 0 ? (
-                            <table className="w-full text-sm sm:text-base text-left text-gray-200">
-                                <thead className="bg-gray-900 bg-opacity-50">
-                                    <tr>
-                                        <th className="px-4 py-3 sm:px-6">ID</th>
-                                        <th className="px-4 py-3 sm:px-6">Title</th>
-                                        <th className="px-4 py-3 sm:px-6">Company</th>
-                                        <th className="px-4 py-3 sm:px-6">Engineer</th>
-                                        <th className="px-4 py-3 sm:px-6">Created</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredTickets.map((ticket) => (
-                                        <tr
-                                            key={ticket._id}
-                                            className="hover:bg-gray-700 hover:bg-opacity-50 border-t border-purple-600 border-opacity-30 transition-all duration-300 cursor-pointer"
-                                            onClick={() => openTicketModal(ticket)}
-                                            role="button"
-                                            tabIndex={0}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter' || e.key === ' ') {
-                                                    e.preventDefault();
-                                                    openTicketModal(ticket);
-                                                }
-                                            }}
-                                        >
-                                            <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[150px]">
-                                                {ticket.tid}
-                                            </td>
-                                            <td className="px-4 py-4 sm:px-6 truncate max-w-[150px] sm:max-w-[200px]">
-                                                {ticket.title}
-                                            </td>
-                                            <td className="px-4 py-4 sm:px-6 truncate max-w-[150px] sm:max-w-[200px]">
-                                                {ticket.company?.name || 'No Company'}
-                                            </td>
-                                            <td className="px-4 py-4 sm:px-6 truncate max-w-[150px] sm:max-w-[200px]">
-                                                {ticket.assignedSupportEngineer?.name || 'Not Assigned'}
-                                            </td>
-                                            <td className="px-4 py-4 sm:px-6">
-                                                {new Date(ticket.createdAt).toLocaleDateString()}
-                                            </td>
+                    {!isLoading && (
+                        <div className="overflow-x-auto bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl shadow-lg">
+                            {metrics.reportData.length === 0 ? (
+                                <p className="text-gray-300 p-6 text-center">No tickets available.</p>
+                            ) : filteredTickets.length > 0 ? (
+                                <table className="w-full text-sm sm:text-base text-left text-gray-200">
+                                    <thead className="bg-gray-900 bg-opacity-50">
+                                        <tr>
+                                            <th className="px-4 py-3 sm:px-6">ID</th>
+                                            <th className="px-4 py-3 sm:px-6">Title</th>
+                                            <th className="px-4 py-3 sm:px-6">Company</th>
+                                            <th className="px-4 py-3 sm:px-6">Engineer</th>
+                                            <th className="px-4 py-3 sm:px-6">Created</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        ) : (
-                            <div className="text-gray-300 text-center py-8">
-                                No tickets match the selected filters.
-                            </div>
-                        )}
-                    </div>
+                                    </thead>
+                                    <tbody>
+                                        {filteredTickets.map((ticket) => (
+                                            <tr
+                                                key={ticket._id}
+                                                className="hover:bg-gray-700 hover:bg-opacity-50 border-t border-purple-600 border-opacity-30 transition-all duration-300 cursor-pointer"
+                                                onClick={() => openTicketModal(ticket)}
+                                                role="button"
+                                                tabIndex={0}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                        e.preventDefault();
+                                                        openTicketModal(ticket);
+                                                    }
+                                                }}
+                                            >
+                                                <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[150px]">
+                                                    {ticket.tid}
+                                                </td>
+                                                <td className="px-4 py-4 sm:px-6 truncate max-w-[150px] sm:max-w-[200px]">
+                                                    {ticket.title}
+                                                </td>
+                                                <td className="px-4 py-4 sm:px-6 truncate max-w-[150px] sm:max-w-[200px]">
+                                                    {ticket.company?.name || 'No Company'}
+                                                </td>
+                                                <td className="px-4 py-4 sm:px-6 truncate max-w-[150px] sm:max-w-[200px]">
+                                                    {ticket.assignedSupportEngineer?.name || 'Not Assigned'}
+                                                </td>
+                                                <td className="px-4 py-4 sm:px-6">
+                                                    {new Date(ticket.createdAt).toLocaleDateString()}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <div className="text-gray-300 text-center py-8">
+                                    No tickets match the selected filters.
+                                </div>
+                            )}
+                        </div>
+                    )}
                     {isModalOpen && selectedTicket && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                             <div className="bg-gray-800 bg-opacity-90 backdrop-blur-md rounded-xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto">
@@ -691,24 +726,14 @@ const ReportPage = () => {
                                     </div>
                                     <div>
                                         <span className="font-medium text-gray-200">Status: </span>
-                                        <span className={`px-2 py-1 rounded-full text-xs ${
-                                            selectedTicket.status === 'open' ? 'bg-gradient-to-r from-blue-500 to-indigo-500' :
-                                            selectedTicket.status === 'in-progress' ? 'bg-gradient-to-r from-yellow-500 to-amber-500' :
-                                            selectedTicket.status === 'closed' ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
-                                            'bg-gradient-to-r from-gray-500 to-gray-600'
-                                        }`}>
-                                            {selectedTicket.status}
+                                        <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(selectedTicket.status)}`}>
+                                            {selectedTicket.status.charAt(0).toUpperCase() + selectedTicket.status.slice(1)}
                                         </span>
                                     </div>
                                     <div>
                                         <span className="font-medium text-gray-200">Priority: </span>
-                                        <span className={`px-2 py-1 rounded-full text-xs ${
-                                            selectedTicket.priority === 1 ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
-                                            selectedTicket.priority === 2 ? 'bg-gradient-to-r from-yellow-500 to-amber-500' :
-                                            selectedTicket.priority === 3 ? 'bg-gradient-to-r from-orange-500 to-red-500' :
-                                            'bg-gradient-to-r from-red-500 to-pink-500'
-                                        }`}>
-                                            {selectedTicket.priority}
+                                        <span className={`px-2 py-1 rounded-full text-xs ${getPriorityColor(selectedTicket.priority)}`}>
+                                            {selectedTicket.priority.charAt(0).toUpperCase() + selectedTicket.priority.slice(1)}
                                         </span>
                                     </div>
                                     <div>

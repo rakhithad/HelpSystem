@@ -122,10 +122,6 @@ const ManageTickets = () => {
             filtered = filtered.filter((ticket) => ticket.status === filters.status);
         }
 
-        if (tickets.companyName) {
-            filtered = filtered.filter((ticket) => ticket.companyName === filters.companyName);
-        }
-
         if (filters.date !== 'all') {
             const now = new Date();
             if (filters.date === 'today') {
@@ -170,14 +166,16 @@ const ManageTickets = () => {
                     { headers: { Authorization: `Bearer ${token}` } }
                 );
                 engineerName = engineerResponse.data
-                    ? `${engineerResponse.data.firstName || ''} ${engineerResponse.data.lastName || ''}`.trim() || 'Unknown User'
+                    ? `${engineerResponse.data.firstName || ''} ${engineerResponse.data.lastName || ''}`.trim() || 'Unknown'
                     : 'Unassigned';
+            } else if (updates.assignedSupportEngineer === null) {
+                engineerName = 'Unassigned';
             }
 
             setTickets((prevTickets) =>
                 prevTickets.map((ticket) =>
                     ticket._id === ticketId
-                        ? { ...ticket, ...updates, engineerName }
+                        ? { ...ticket, ...response.data, engineerName }
                         : ticket
                 )
             );
@@ -208,12 +206,10 @@ const ManageTickets = () => {
         }
 
         try {
-            await axios.delete(
-                `${process.env.REACT_APP_BACKEND_BASEURL}/tickets/delete-ticket/${deleteTicketId}`,
-                {
-                    headers: { Authorization: `Bearer ${token}` },
-                    data: { reason: deleteReason.trim() },
-                }
+            await axios.put(
+                `${process.env.REACT_APP_BACKEND_BASEURL}/tickets/update-ticket/${deleteTicketId}`,
+                { status: 'deleted', description: `Deleted: ${deleteReason.trim()}` },
+                { headers: { Authorization: `Bearer ${token}` } }
             );
 
             setTickets((prevTickets) =>
@@ -408,17 +404,17 @@ const ManageTickets = () => {
                                                                 description: e.target.value,
                                                             })
                                                         }
-                                                        className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
+                                                        className="w-full p-2 rounded-lg bg-white text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-300 transition-all duration-200"
                                                         rows="3"
                                                     />
                                                 ) : (
                                                     <span className="truncate block">
-                                                        {ticket.description || 'No description'}
+                                                        {ticket.description || 'No description available.'}
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[150px]">
-                                                {ticket.customerName || 'Unknown User'}
+                                            <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[200px]">
+                                                {ticket.customerName || 'Unknown'}
                                             </td>
                                             <td className="px-4 py-4 sm:px-6">
                                                 {editingTicketId === ticket._id ? (
@@ -429,33 +425,38 @@ const ManageTickets = () => {
                                                                 status: e.target.value,
                                                             })
                                                         }
-                                                        className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
+                                                        className="p-2 rounded-lg bg-white text-gray-800 focus:ring-2 focus:ring-blue-500 border-gray-300 transition-all duration-200"
                                                     >
-                                                        <option value="not started" className="bg-gray-900">Not Started</option>
-                                                        <option value="in progress" className="bg-gray-900">In Progress</option>
-                                                        <option value="stuck" className="bg-gray-900">Stuck</option>
-                                                        <option value="done" className="bg-gray-900">Done</option>
+                                                        <option value="not started" className="bg-white text-gray-800">Not Started</option>
+                                                        <option value="in progress" className="bg-white text-gray-800">In Progress</option>
+                                                        <option value="stuck" className="bg-white text-gray-800">Stuck</option>
+                                                        <option value="done" className="bg-white text-gray-800">Done</option>
                                                     </select>
                                                 ) : (
-                                                    ticket.status
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ticket-status-${ticket.status.replace(' ', '-')}`}>
+                                                        {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1).replace('-', ' ')}
+                                                    </span>
                                                 )}
                                             </td>
                                             <td className="px-4 py-4 sm:px-6">
                                                 {editingTicketId === ticket._id ? (
-                                                    <input
-                                                        type="number"
+                                                    <select
                                                         value={ticket.priority}
-                                                        min="1"
-                                                        max="5"
                                                         onChange={(e) =>
                                                             handleUpdateTicket(ticket._id, {
-                                                                priority: Number(e.target.value),
+                                                                priority: e.target.value,
                                                             })
                                                         }
-                                                        className="w-16 p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                                    />
+                                                        className="p-2 rounded-lg bg-white text-gray-800 focus:ring-2 focus:ring-blue-500 border-gray-300 transition-all duration-200"
+                                                    >
+                                                        <option value="low" className="bg-white text-gray-800">Low</option>
+                                                        <option value="medium" className="bg-white text-gray-800">Medium</option>
+                                                        <option value="high" className="bg-white text-gray-800">High</option>
+                                                    </select>
                                                 ) : (
-                                                    ticket.priority
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ticket-priority-${ticket.priority}`}>
+                                                        {ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1)}
+                                                    </span>
                                                 )}
                                             </td>
                                             <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[150px]">
@@ -467,11 +468,11 @@ const ManageTickets = () => {
                                                                 assignedSupportEngineer: e.target.value || null,
                                                             })
                                                         }
-                                                        className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
+                                                        className="p-2 rounded-lg bg-white text-gray-800 focus:ring-2 focus:ring-blue-500 border-gray-300 transition-all duration-200"
                                                     >
-                                                        <option value="" className="bg-gray-900">Not Assigned</option>
+                                                        <option value="" className="bg-white text-gray-800">Not Assigned</option>
                                                         {supportEngineers.map((engineer) => (
-                                                            <option key={engineer.uid} value={engineer.uid} className="bg-gray-900">
+                                                            <option key={engineer.uid} value={engineer.uid} className="bg-white text-gray-800">
                                                                 {engineer.firstName} {engineer.lastName}
                                                             </option>
                                                         ))}
@@ -481,7 +482,7 @@ const ManageTickets = () => {
                                                 )}
                                             </td>
                                             <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[150px]">
-                                                {ticket.companyName || 'No Company'}
+                                                {ticket.companyName || 'Unknown'}
                                             </td>
                                             <td className="px-4 py-4 sm:px-6 flex gap-2 flex-wrap">
                                                 <button

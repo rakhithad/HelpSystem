@@ -8,7 +8,7 @@ const CreateTicket = () => {
     const [formData, setFormData] = useState({
         title: '',
         description: '',
-        priority: 1,
+        priority: 'medium',
         customerUid: '',
         assignedSupportEngineer: '',
     });
@@ -101,7 +101,8 @@ const CreateTicket = () => {
                 let requestData = { ...formData };
 
                 if (role === 'customer') {
-                    requestData.priority = 1;
+                    delete requestData.priority; // Backend sets default to 'medium'
+                    delete requestData.customerUid; // Backend uses logged-in user's UID
                 }
 
                 if (role === 'support_engineer') {
@@ -116,12 +117,12 @@ const CreateTicket = () => {
                 setFormData({
                     title: '',
                     description: '',
-                    priority: 1,
+                    priority: 'medium',
                     customerUid: '',
                     assignedSupportEngineer: '',
                 });
             } catch (err) {
-                setError('Failed to create ticket. Please try again.');
+                setError(err.response?.data?.message || 'Failed to create ticket. Please try again.');
             } finally {
                 setIsLoading(false);
             }
@@ -219,22 +220,35 @@ const CreateTicket = () => {
                                 {(role === 'admin' || role === 'support_engineer') && (
                                     <div>
                                         <label className="block text-gray-200 font-medium mb-2">
-                                            Priority (1-5)
+                                            Priority
                                         </label>
-                                        <input
-                                            type="number"
+                                        <select
                                             name="priority"
                                             value={formData.priority}
                                             onChange={handleChange}
-                                            min="1"
-                                            max="5"
                                             required
-                                            className="w-full p-3 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                            placeholder="1"
+                                            className="w-full p-3 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
+                                        >
+                                            <option value="low" className="bg-gray-900">Low</option>
+                                            <option value="medium" className="bg-gray-900">Medium</option>
+                                            <option value="high" className="bg-gray-900">High</option>
+                                        </select>
+                                    </div>
+                                )}
+                                {role === 'customer' && (
+                                    <div>
+                                        <label className="block text-gray-200 font-medium mb-2">
+                                            Priority
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value="Medium"
+                                            disabled
+                                            className="w-full p-3 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-gray-400 cursor-not-allowed"
                                         />
                                     </div>
                                 )}
-                                {customers.length > 0 && (
+                                {(role === 'admin' || role === 'support_engineer') && customers.length > 0 && (
                                     <div>
                                         <label className="block text-gray-200 font-medium mb-2">
                                             Assign Customer
@@ -274,7 +288,7 @@ const CreateTicket = () => {
                                             </option>
                                             {supportEngineers.map((engineer) => (
                                                 <option key={engineer.uid} value={engineer.uid} className="bg-gray-900">
-                                                    {engineer.firstName} ({engineer.uid})
+                                                    {engineer.firstName} {engineer.lastName} ({engineer.uid})
                                                 </option>
                                             ))}
                                         </select>
