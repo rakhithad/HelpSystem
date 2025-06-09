@@ -30,6 +30,10 @@ const Register = () => {
                     const response = await axios.get(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/companies`);
                     setCompanies(response.data);
                     setShowCompanyDropdown(response.data.length > 0);
+                    // Set default companyId if companies exist
+                    if (response.data.length > 0) {
+                        setCompanyId(response.data[0].companyId);
+                    }
                 } catch (error) {
                     console.error('Error fetching companies:', error);
                     setError('Failed to load companies');
@@ -50,8 +54,15 @@ const Register = () => {
         setError('');
         setSuccess('');
 
+        // Validate companyId for customer role
+        if (role === 'customer' && !companyId) {
+            setError('Please select a company for customer role');
+            setIsLoading(false);
+            return;
+        }
+
         try {
-            await axios.post(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/register`, {
+            const payload = {
                 email: email.toLowerCase(),
                 password,
                 firstName: firstName.toLowerCase(),
@@ -61,8 +72,14 @@ const Register = () => {
                 location: location.toLowerCase(),
                 role: role.toLowerCase(),
                 avatar,
-                ...(role === 'customer' && { companyId }),
-            });
+            };
+
+            // Only include companyId for customer role
+            if (role === 'customer') {
+                payload.companyId = companyId;
+            }
+
+            await axios.post(`${process.env.REACT_APP_BACKEND_BASEURL}/auth/register`, payload);
             setSuccess('User registered successfully!');
             setEmail('');
             setPassword('');
@@ -74,9 +91,10 @@ const Register = () => {
             setAvatar('');
             setRole('customer');
             setCompanyId('');
+            navigate('/manage-users'); // Redirect to ManageUsers after success
         } catch (error) {
             console.error('Error registering user:', error);
-            setError('Error registering user');
+            setError(error.response?.data?.message || 'Error registering user');
         } finally {
             setIsLoading(false);
         }
@@ -250,7 +268,7 @@ const Register = () => {
                                 <select
                                     value={companyId}
                                     onChange={(e) => setCompanyId(e.target.value)}
-                                    required
+                                    required={role === 'customer'}
                                     className={selectClasses}
                                 >
                                     <option value="" className="bg-gray-900">Select a Company</option>
