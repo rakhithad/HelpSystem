@@ -11,7 +11,12 @@ const ticketSchema = new mongoose.Schema(
       default: 'not started',
       required: true
     },
-    priority: { type: Number, min: 1, max: 5, required: true },
+    priority: {
+      type: String,
+      enum: ['low', 'medium', 'high'],
+      default: 'medium',
+      required: true
+    },
     uid: { type: String, required: true }, 
     assignedSupportEngineer: { type: String, default: null },
     review: { type: String, default: null },

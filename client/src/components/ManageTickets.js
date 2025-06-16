@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { FaSpinner, FaBars, FaHome, FaUser, FaPlus } from 'react-icons/fa';
+import { FaSpinner, FaBars, FaHome, FaUser, FaPlus, FaEdit, FaTrash, FaSearch } from 'react-icons/fa';
 import Sidebar from './Sidebar';
 
 const ManageTickets = () => {
     const [tickets, setTickets] = useState([]);
     const [filteredTickets, setFilteredTickets] = useState([]);
+    const [groupedTickets, setGroupedTickets] = useState({});
     const [supportEngineers, setSupportEngineers] = useState([]);
     const [userRole, setUserRole] = useState('');
-    const [filters, setFilters] = useState({ status: '', date: 'all' });
+    const [filters, setFilters] = useState({ status: '', date: 'all', customStart: '', customEnd: '', search: '' });
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -19,19 +20,16 @@ const ManageTickets = () => {
     const [deleteReason, setDeleteReason] = useState('');
     const [editingTicketId, setEditingTicketId] = useState(null);
     const navigate = useNavigate();
-    const location = useLocation(); // Access navigation state
-
+    const location = useLocation();
     const token = localStorage.getItem('token');
     const userUid = localStorage.getItem('uid');
 
-    // Redirect to login if no token
     useEffect(() => {
         if (!token) {
             navigate('/login');
         }
     }, [token, navigate]);
 
-    // Handle updated ticket from ReviewTicketPage
     useEffect(() => {
         if (location.state?.updatedTicket) {
             const updatedTicket = location.state.updatedTicket;
@@ -49,12 +47,10 @@ const ManageTickets = () => {
                         : ticket
                 )
             );
-            // Clear the location state to prevent reprocessing
             navigate('/view-tickets', { replace: true, state: {} });
         }
     }, [location.state, navigate]);
 
-    // Close sidebar when clicking outside on mobile
     useEffect(() => {
         const handleClickOutside = (event) => {
             const sidebar = document.querySelector('.sidebar-container');
@@ -74,7 +70,6 @@ const ManageTickets = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isSidebarOpen]);
 
-    // Disable body scroll when sidebar is open on mobile
     useEffect(() => {
         if (window.innerWidth < 1024) {
             document.body.style.overflow = isSidebarOpen ? 'hidden' : 'auto';
@@ -84,13 +79,11 @@ const ManageTickets = () => {
         };
     }, [isSidebarOpen]);
 
-    // Fetch tickets and support engineers
     useEffect(() => {
         const fetchData = async () => {
             setIsLoading(true);
             setError(null);
             try {
-                // Fetch tickets with company details
                 const ticketsResponse = await axios.get(
                     `${process.env.REACT_APP_BACKEND_BASEURL}/tickets/view-tickets-with-company`,
                     { headers: { Authorization: `Bearer ${token}` } }
@@ -99,7 +92,6 @@ const ManageTickets = () => {
                 setFilteredTickets(ticketsResponse.data.tickets);
                 setUserRole(ticketsResponse.data.role);
 
-                // Fetch support engineers (only for admins)
                 if (ticketsResponse.data.role === 'admin') {
                     const engineersResponse = await axios.get(
                         `${process.env.REACT_APP_BACKEND_BASEURL}/auth/support-engineers`,
@@ -119,14 +111,27 @@ const ManageTickets = () => {
         }
     }, [token]);
 
-    // Apply filters (only for admins)
     useEffect(() => {
         if (userRole !== 'admin') {
-            setFilteredTickets(tickets);
+            let filtered = tickets.filter((ticket) =>
+                filters.search
+                    ? ticket.tid.toLowerCase().includes(filters.search.toLowerCase()) ||
+                      ticket.title.toLowerCase().includes(filters.search.toLowerCase()) ||
+                      (ticket.description || '').toLowerCase().includes(filters.search.toLowerCase())
+                    : true
+            );
+            setFilteredTickets(filtered);
+            setGroupedTickets({ 'All Tickets': filtered });
             return;
         }
 
-        let filtered = [...tickets];
+        let filtered = tickets.filter((ticket) =>
+            filters.search
+                ? ticket.tid.toLowerCase().includes(filters.search.toLowerCase()) ||
+                  ticket.title.toLowerCase().includes(filters.search.toLowerCase()) ||
+                  (ticket.description || '').toLowerCase().includes(filters.search.toLowerCase())
+                : true
+        );
 
         if (filters.status) {
             filtered = filtered.filter((ticket) => ticket.status === filters.status);
@@ -150,7 +155,21 @@ const ManageTickets = () => {
                 filtered = filtered.filter(
                     (ticket) => new Date(ticket.createdAt) >= monthAgo
                 );
+            } else if (filters.date === 'custom' && filters.customStart && filters.customEnd) {
+                const start = new Date(filters.customStart);
+                const end = new Date(filters.customEnd);
+                end.setHours(23, 59, 59, 999);
+                filtered = filtered.filter(
+                    (ticket) => {
+                        const ticketDate = new Date(ticket.createdAt);
+                        return ticketDate >= start && ticketDate <= end;
+                    }
+                );
+                const weekLabel = `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`;
+                setGroupedTickets({ [weekLabel]: filtered });
             }
+        } else {
+            setGroupedTickets({ 'All Tickets': filtered });
         }
 
         setFilteredTickets(filtered);
@@ -168,12 +187,27 @@ const ManageTickets = () => {
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
+            let engineerName = updates.assignedSupportEngineer;
+            if (updates.assignedSupportEngineer) {
+                const engineerResponse = await axios.get(
+                    `${process.env.REACT_APP_BACKEND_BASEURL}/auth/user/${updates.assignedSupportEngineer}`,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+                engineerName = engineerResponse.data
+                    ? `${engineerResponse.data.firstName || ''} ${engineerResponse.data.lastName || ''}`.trim() || 'Unknown'
+                    : 'Unassigned';
+            } else if (updates.assignedSupportEngineer === null) {
+                engineerName = 'Unassigned';
+            }
+
             setTickets((prevTickets) =>
                 prevTickets.map((ticket) =>
-                    ticket._id === ticketId ? { ...ticket, ...updates } : ticket
+                    ticket._id === ticketId
+                        ? { ...ticket, ...response.data, engineerName }
+                        : ticket
                 )
             );
-            setEditingTicketId(null); // Exit edit mode after update
+            setEditingTicketId(null);
             setError(null);
             setSuccess('Ticket updated successfully!');
         } catch (err) {
@@ -200,12 +234,10 @@ const ManageTickets = () => {
         }
 
         try {
-            await axios.delete(
-                `${process.env.REACT_APP_BACKEND_BASEURL}/tickets/delete-ticket/${deleteTicketId}`,
-                {
-                    headers: { Authorization: `Bearer ${token}` },
-                    data: { reason: deleteReason.trim() },
-                }
+            await axios.put(
+                `${process.env.REACT_APP_BACKEND_BASEURL}/tickets/update-ticket/${deleteTicketId}`,
+                { status: 'deleted', description: `Deleted: ${deleteReason.trim()}` },
+                { headers: { Authorization: `Bearer ${token}` } }
             );
 
             setTickets((prevTickets) =>
@@ -323,6 +355,19 @@ const ManageTickets = () => {
                     {/* Filters (only for admins) */}
                     {userRole === 'admin' && (
                         <div className="p-4 sm:p-6 bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl shadow-lg mb-6">
+                            <div className="mb-4">
+                                <label className="block text-gray-200 font-medium mb-2">Search Tickets</label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        value={filters.search}
+                                        onChange={(e) => handleFilterChange('search', e.target.value)}
+                                        placeholder="Search by TID, title, or description"
+                                        className="w-full p-3 pl-10 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
+                                    />
+                                    <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                                </div>
+                            </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                                 <div>
                                     <label className="block text-gray-200 font-medium mb-2">Status</label>
@@ -349,170 +394,196 @@ const ManageTickets = () => {
                                         <option value="today" className="bg-gray-900">Today</option>
                                         <option value="this week" className="bg-gray-900">This Week</option>
                                         <option value="this month" className="bg-gray-900">This Month</option>
+                                        <option value="custom" className="bg-gray-900">Custom Dates</option>
                                     </select>
                                 </div>
+                                {filters.date === 'custom' && (
+                                    <div className="sm:col-span-2">
+                                        <label className="block text-gray-200 font-medium mb-2">Custom Date Range</label>
+                                        <div className="flex flex-col sm:flex-row gap-4">
+                                            <input
+                                                type="date"
+                                                value={filters.customStart}
+                                                onChange={(e) => handleFilterChange('customStart', e.target.value)}
+                                                className="flex-1 p-3 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
+                                            />
+                                            <span className="self-center text-gray-200 hidden sm:block">to</span>
+                                            <input
+                                                type="date"
+                                                value={filters.customEnd}
+                                                onChange={(e) => handleFilterChange('customEnd', e.target.value)}
+                                                className="flex-1 p-3 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
 
-                    {/* Loading Spinner */}
-                    {isLoading && (
-                        <div className="flex justify-center items-center py-12">
-                            <FaSpinner className="animate-spin h-8 w-8 text-purple-400" />
-                        </div>
-                    )}
-
                     {/* Tickets Table */}
-                    <div className="overflow-x-auto bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl shadow-lg">
-                        {filteredTickets.length === 0 ? (
+                    <div className="space-y-8">
+                        {Object.keys(groupedTickets).length === 0 ? (
                             <p className="text-gray-300 p-6 text-center">No tickets available.</p>
                         ) : (
-                            <table className="w-full text-sm sm:text-base text-left text-gray-200">
-                                <thead className="bg-gray-900 bg-opacity-50">
-                                    <tr>
-                                        <th className="px-4 py-3 sm:px-6">TID</th>
-                                        <th className="px-4 py-3 sm:px-6">Title</th>
-                                        <th className="px-4 py-3 sm:px-6">Description</th>
-                                        <th className="px-4 py-3 sm:px-6">UID</th>
-                                        <th className="px-4 py-3 sm:px-6">Status</th>
-                                        <th className="px-4 py-3 sm:px-6">Priority</th>
-                                        <th className="px-4 py-3 sm:px-6">Assigned Engineer</th>
-                                        <th className="px-4 py-3 sm:px-6">Company</th>
-                                        <th className="px-4 py-3 sm:px-6">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredTickets.map((ticket) => (
-                                        <tr
-                                            key={ticket._id}
-                                            className="hover:bg-gray-700 hover:bg-opacity-50 border-t border-purple-600 border-opacity-30 transition-all duration-300"
-                                        >
-                                            <td className="px-4 py-4 sm:px-6">{ticket.tid}</td>
-                                            <td className="px-4 py-4 sm:px-6 truncate max-w-[150px] sm:max-w-[200px]">
-                                                {ticket.title}
-                                            </td>
-                                            <td className="px-4 py-4 sm:px-6 max-w-[200px] sm:max-w-[250px]">
-                                                {editingTicketId === ticket._id ? (
-                                                    <textarea
-                                                        value={ticket.description}
-                                                        onChange={(e) =>
-                                                            handleUpdateTicket(ticket._id, {
-                                                                description: e.target.value,
-                                                            })
-                                                        }
-                                                        className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                                        rows="3"
-                                                    />
-                                                ) : (
-                                                    <span className="truncate block">
-                                                        {ticket.description || 'No description'}
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[150px]">
-                                                {ticket.uid}
-                                            </td>
-                                            <td className="px-4 py-4 sm:px-6">
-                                                {editingTicketId === ticket._id ? (
-                                                    <select
-                                                        value={ticket.status}
-                                                        onChange={(e) =>
-                                                            handleUpdateTicket(ticket._id, {
-                                                                status: e.target.value,
-                                                            })
-                                                        }
-                                                        className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
+                            Object.entries(groupedTickets).map(([period, periodTickets]) => (
+                                <div key={period}>
+                                    <h2 className="text-xl font-semibold text-gray-200 mb-4">{period}</h2>
+                                    <div className="overflow-x-auto bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl shadow-lg">
+                                        <table className="w-full text-sm sm:text-base text-left text-gray-200">
+                                            <thead className="bg-gray-900 bg-opacity-50">
+                                                <tr>
+                                                    <th className="px-4 py-3 sm:px-6">TID</th>
+                                                    <th className="px-4 py-3 sm:px-6">Title</th>
+                                                    <th className="px-4 py-3 sm:px-6">Description</th>
+                                                    <th className="px-4 py-3 sm:px-6">Customer</th>
+                                                    <th className="px-4 py-3 sm:px-6">Status</th>
+                                                    <th className="px-4 py-3 sm:px-6">Priority</th>
+                                                    <th className="px-4 py-3 sm:px-6">Assigned Engineer</th>
+                                                    <th className="px-4 py-3 sm:px-6">Company</th>
+                                                    <th className="px-4 py-3 sm:px-6">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {periodTickets.map((ticket) => (
+                                                    <tr
+                                                        key={ticket._id}
+                                                        className="hover:bg-gray-700 hover:bg-opacity-50 border-t border-purple-600 border-opacity-30 transition-all duration-300"
                                                     >
-                                                        <option value="not started" className="bg-gray-900">Not Started</option>
-                                                        <option value="in progress" className="bg-gray-900">In Progress</option>
-                                                        <option value="stuck" className="bg-gray-900">Stuck</option>
-                                                        <option value="done" className="bg-gray-900">Done</option>
-                                                    </select>
-                                                ) : (
-                                                    ticket.status
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-4 sm:px-6">
-                                                {editingTicketId === ticket._id ? (
-                                                    <input
-                                                        type="number"
-                                                        value={ticket.priority}
-                                                        min="1"
-                                                        max="5"
-                                                        onChange={(e) =>
-                                                            handleUpdateTicket(ticket._id, {
-                                                                priority: Number(e.target.value),
-                                                            })
-                                                        }
-                                                        className="w-16 p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                                    />
-                                                ) : (
-                                                    ticket.priority
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[150px]">
-                                                {editingTicketId === ticket._id && userRole === 'admin' ? (
-                                                    <select
-                                                        value={ticket.assignedSupportEngineer || ''}
-                                                        onChange={(e) =>
-                                                            handleUpdateTicket(ticket._id, {
-                                                                assignedSupportEngineer: e.target.value || null,
-                                                            })
-                                                        }
-                                                        className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                                    >
-                                                        <option value="" className="bg-gray-900">Not Assigned</option>
-                                                        {supportEngineers.map((engineer) => (
-                                                            <option key={engineer.uid} value={engineer.uid} className="bg-gray-900">
-                                                                {engineer.firstName} {engineer.lastName}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                ) : (
-                                                    ticket.assignedSupportEngineer || 'Unassigned'
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[150px]">
-                                                {ticket.companyName || 'No Company'}
-                                            </td>
-                                            <td className="px-4 py-4 sm:px-6 flex gap-2 flex-wrap">
-                                                <button
-                                                    onClick={() => toggleEditMode(ticket._id)}
-                                                    className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-300"
-                                                >
-                                                    {editingTicketId === ticket._id ? 'Save' : 'Edit'}
-                                                </button>
-                                                {(userRole === 'admin' ||
-                                                    (userRole === 'customer' && ticket.uid === userUid)) && (
-                                                    <button
-                                                        onClick={() => handleDeleteTicket(ticket._id)}
-                                                        className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-300"
-                                                    >
-                                                        Delete
-                                                    </button>
-                                                )}
-                                                {userRole === 'customer' && ticket.status === 'done' && (
-                                                    ticket.reviewed ? (
-                                                        <button
-                                                            className="px-3 py-1 bg-gray-600 text-white rounded-lg transition-all duration-300 opacity-70 cursor-not-allowed"
-                                                            disabled
-                                                        >
-                                                            Review Submitted
-                                                        </button>
-                                                    ) : (
-                                                        <Link
-                                                            to={`/review-ticket/${ticket._id}`}
-                                                            className="px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all duration-300"
-                                                        >
-                                                            Review
-                                                        </Link>
-                                                    )
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                                        <td className="px-4 py-4 sm:px-6">{ticket.tid}</td>
+                                                        <td className="px-4 py-4 sm:px-6 truncate max-w-[150px] sm:max-w-[200px]">
+                                                            {ticket.title}
+                                                        </td>
+                                                        <td className="px-4 py-4 sm:px-6 max-w-[200px] sm:max-w-[250px]">
+                                                            {editingTicketId === ticket._id ? (
+                                                                <textarea
+                                                                    value={ticket.description}
+                                                                    onChange={(e) =>
+                                                                        handleUpdateTicket(ticket._id, {
+                                                                            description: e.target.value,
+                                                                        })
+                                                                    }
+                                                                    className="w-full p-2 rounded-lg bg-white text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-300 transition-all duration-200"
+                                                                    rows="3"
+                                                                />
+                                                            ) : (
+                                                                <span className="truncate block">
+                                                                    {ticket.description || 'No description available.'}
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[200px]">
+                                                            {ticket.customerName || 'Unknown'}
+                                                        </td>
+                                                        <td className="px-4 py-4 sm:px-6">
+                                                            {editingTicketId === ticket._id ? (
+                                                                <select
+                                                                    value={ticket.status}
+                                                                    onChange={(e) =>
+                                                                        handleUpdateTicket(ticket._id, {
+                                                                            status: e.target.value,
+                                                                        })
+                                                                    }
+                                                                    className="p-2 rounded-lg bg-white text-gray-800 focus:ring-2 focus:ring-blue-500 border-gray-300 transition-all duration-200"
+                                                                >
+                                                                    <option value="not started" className="bg-white text-gray-800">Not Started</option>
+                                                                    <option value="in progress" className="bg-white text-gray-800">In Progress</option>
+                                                                    <option value="stuck" className="bg-white text-gray-800">Stuck</option>
+                                                                    <option value="done" className="bg-white text-gray-800">Done</option>
+                                                                </select>
+                                                            ) : (
+                                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ticket-status-${ticket.status.replace(' ', '-')}`}>
+                                                                    {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1).replace('-', ' ')}
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-4 sm:px-6">
+                                                            {editingTicketId === ticket._id ? (
+                                                                <select
+                                                                    value={ticket.priority}
+                                                                    onChange={(e) =>
+                                                                        handleUpdateTicket(ticket._id, {
+                                                                            priority: e.target.value,
+                                                                        })
+                                                                    }
+                                                                    className="p-2 rounded-lg bg-white text-gray-800 focus:ring-2 focus:ring-blue-500 border-gray-300 transition-all duration-200"
+                                                                >
+                                                                    <option value="low" className="bg-white text-gray-800">Low</option>
+                                                                    <option value="medium" className="bg-white text-gray-800">Medium</option>
+                                                                    <option value="high" className="bg-white text-gray-800">High</option>
+                                                                </select>
+                                                            ) : (
+                                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ticket-priority-${ticket.priority}`}>
+                                                                    {ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1)}
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[150px]">
+                                                            {editingTicketId === ticket._id && userRole === 'admin' ? (
+                                                                <select
+                                                                    value={ticket.assignedSupportEngineer || ''}
+                                                                    onChange={(e) =>
+                                                                        handleUpdateTicket(ticket._id, {
+                                                                            assignedSupportEngineer: e.target.value || null,
+                                                                        })
+                                                                    }
+                                                                    className="p-2 rounded-lg bg-white text-gray-800 focus:ring-2 focus:ring-blue-500 border-gray-300 transition-all duration-200"
+                                                                >
+                                                                    <option value="" className="bg-white text-gray-800">Not Assigned</option>
+                                                                    {supportEngineers.map((engineer) => (
+                                                                        <option key={engineer.uid} value={engineer.uid} className="bg-white text-gray-800">
+                                                                            {engineer.firstName} {engineer.lastName}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                            ) : (
+                                                                ticket.engineerName || 'Unassigned'
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[150px]">
+                                                            {ticket.companyName || 'Unknown'}
+                                                        </td>
+                                                        <td className="px-4 py-4 sm:px-6 flex gap-2 flex-wrap">
+                                                            <button
+                                                                onClick={() => toggleEditMode(ticket._id)}
+                                                                className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-300"
+                                                            >
+                                                                {editingTicketId === ticket._id ? 'Save' : <FaEdit className="w-5 h-5" />}
+                                                            </button>
+                                                            {(userRole === 'admin' ||
+                                                                (userRole === 'customer' && ticket.uid === userUid)) && (
+                                                                <button
+                                                                    onClick={() => handleDeleteTicket(ticket._id)}
+                                                                    className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-300"
+                                                                >
+                                                                    <FaTrash className="w-5 h-5" />
+                                                                </button>
+                                                            )}
+                                                            {userRole === 'customer' && ticket.status === 'done' && (
+                                                                ticket.reviewed ? (
+                                                                    <button
+                                                                        className="px-3 py-1 bg-gray-600 text-white rounded-lg transition-all duration-300 opacity-70 cursor-not-allowed"
+                                                                        disabled
+                                                                    >
+                                                                        Review Submitted
+                                                                    </button>
+                                                                ) : (
+                                                                    <Link
+                                                                        to={`/review-ticket/${ticket._id}`}
+                                                                        className="px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all duration-300"
+                                                                    >
+                                                                        Review
+                                                                    </Link>
+                                                                )
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            ))
                         )}
                     </div>
                 </div>

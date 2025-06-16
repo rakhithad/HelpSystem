@@ -13,56 +13,7 @@ const HomePage = () => {
                 <div className="text-3xl sm:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 hover:from-purple-500 hover:to-pink-500 transition-all duration-300 cursor-pointer">
                     HelpDesk
                 </div>
-                <div className="hidden sm:flex items-center space-x-6">
-                    <Link to="/view-reviews">
-                        <button
-                            className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full shadow-md hover:from-purple-700 hover:to-pink-700 hover:scale-105 transition-all duration-300 text-base font-medium focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2"
-                            aria-label="View customer reviews"
-                        >
-                            Reviews
-                        </button>
-                    </Link>
-                    <Link to="/login">
-                        <button
-                            className="px-6 py-2.5 bg-gradient-to-r from-gray-700 to-gray-800 text-white rounded-full shadow-md hover:from-gray-800 hover:to-gray-900 hover:scale-105 transition-all duration-300 text-base font-medium focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2"
-                            aria-label="Log in to HelpDesk"
-                        >
-                            Login
-                        </button>
-                    </Link>
-                </div>
-                <button
-                    className="sm:hidden text-gray-200 hover:text-purple-400 transition-colors duration-200"
-                    onClick={() => setIsMenuOpen(!isMenuOpen)}
-                    aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
-                >
-                    {isMenuOpen ? <FaTimes className="w-7 h-7" /> : <FaBars className="w-7 h-7" />}
-                </button>
             </nav>
-
-            {/* Mobile Menu */}
-            <div
-                className={`sm:hidden bg-gray-900/95 backdrop-blur-lg px-6 py-6 flex flex-col space-y-4 z-40 transition-all duration-300 ease-in-out ${
-                    isMenuOpen ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'
-                }`}
-            >
-                <Link to="/view-reviews" onClick={() => setIsMenuOpen(false)}>
-                    <button
-                        className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full shadow-md hover:from-purple-700 hover:to-pink-700 hover:scale-105 transition-all duration-300 text-base font-medium focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2"
-                        aria-label="View customer reviews"
-                    >
-                        Reviews
-                    </button>
-                </Link>
-                <Link to="/login" onClick={() => setIsMenuOpen(false)}>
-                    <button
-                        className="w-full px-6 py-3 bg-gradient-to-r from-gray-700 to-gray-800 text-white rounded-full shadow-md hover:from-gray-800 hover:to-gray-900 hover:scale-105 transition-all duration-300 text-base font-medium focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2"
-                        aria-label="Log in to HelpDesk"
-                    >
-                        Login
-                    </button>
-                </Link>
-            </div>
 
             {/* Content Wrapper */}
             <div className="flex-1 flex flex-col">

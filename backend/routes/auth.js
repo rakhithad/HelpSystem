@@ -19,10 +19,12 @@ router.post('/register', async (req, res) => {
     try {
         // Check if the email already exists
         const existingUser = await User.findOne({ email });
-        if (existingUser) return res.status(400).json({ message: 'email already taken' });
+        if (existingUser) return res.status(400).json({ message: 'Email already taken' });
 
         // Validate or assign companyId
-        let finalCompanyId = companyId;
+        let finalCompanyId;
+        const defaultCompanyId = 'COMP-1'; // Use COMP-1 as default from your database
+
         if (role === 'customer') {
             if (!companyId) {
                 return res.status(400).json({ message: 'Company ID is required for customers' });
@@ -31,9 +33,17 @@ router.post('/register', async (req, res) => {
             if (!company) {
                 return res.status(400).json({ message: 'Invalid companyId. Please create a company first.' });
             }
+            finalCompanyId = companyId;
         } else if (role === 'admin' || role === 'support_engineer') {
-            // Assign default companyId for admins and support engineers if not provided
-            finalCompanyId = companyId || 'COMP-3';
+            // Assign default companyId for admins and support engineers
+            finalCompanyId = defaultCompanyId;
+            // Validate default company exists
+            const company = await Company.findOne({ companyId: finalCompanyId });
+            if (!company) {
+                return res.status(400).json({ message: `Default company ${finalCompanyId} does not exist.` });
+            }
+        } else {
+            return res.status(400).json({ message: 'Invalid role' });
         }
 
         console.log('Assigned companyId:', finalCompanyId);
@@ -80,7 +90,7 @@ router.post('/register', async (req, res) => {
         res.status(201).json({ message: 'User registered successfully', token });
     } catch (error) {
         console.error('Error registering user:', error);
-        res.status(500).json({ message: 'Error registering user' });
+        res.status(500).json({ message: 'Error registering user', error: error.message });
     }
 });
 
@@ -135,15 +145,16 @@ router.post('/login', async (req, res) => {
 
 router.get('/support-engineers', authenticateToken, async (req, res) => {
     try {
-        const supportEngineers = await User.find(
-            { role: 'support_engineer', userStatus: 'active' },
-            'firstName uid'
-        );
-        res.status(200).json(supportEngineers);
-        console.log('Support Engineers:', supportEngineers);
-    } catch (error) {
-        console.error('Error fetching support engineers:', error);
-        res.status(500).json({ message: 'Failed to fetch support engineers' });
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+        const engineers = await User.find({ 
+            role: 'support_engineer',
+            userStatus: 'active'
+        }).select('uid firstName lastName');
+        res.json(engineers);
+    } catch (err) {
+        res.status(500).json({ message: 'Failed to fetch support engineers', error: err.message });
     }
 });
 

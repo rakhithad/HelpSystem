@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
-import { FaSpinner, FaBars, FaHome, FaUser, FaPlus } from 'react-icons/fa';
+import { FaSpinner, FaBars, FaHome, FaUser, FaPlus, FaEdit, FaTrash, FaSearch } from 'react-icons/fa';
 import Sidebar from './Sidebar';
 
 const ManageCompanies = () => {
     const [companies, setCompanies] = useState([]);
+    const [filteredCompanies, setFilteredCompanies] = useState([]);
     const [editingCompanyId, setEditingCompanyId] = useState(null);
     const [editedCompany, setEditedCompany] = useState({});
     const [isLoading, setIsLoading] = useState(false);
@@ -16,6 +17,7 @@ const ManageCompanies = () => {
     const [deleteReason, setDeleteReason] = useState('');
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [userRole, setUserRole] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
     const navigate = useNavigate();
 
     // Close sidebar when clicking outside on mobile
@@ -67,6 +69,7 @@ const ManageCompanies = () => {
                     }
                 );
                 setCompanies(companiesResponse.data);
+                setFilteredCompanies(companiesResponse.data);
 
                 // Fetch current user's role
                 const userResponse = await axios.get(
@@ -86,6 +89,24 @@ const ManageCompanies = () => {
         fetchData();
     }, [navigate]);
 
+    // Filter companies based on search query
+    useEffect(() => {
+        if (userRole !== 'admin') {
+            setFilteredCompanies(companies);
+            return;
+        }
+
+        const filtered = companies.filter((company) =>
+            searchQuery
+                ? company.companyId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (company.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (company.address || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (company.phoneNumber || '').toLowerCase().includes(searchQuery.toLowerCase())
+                : true
+        );
+        setFilteredCompanies(filtered);
+    }, [searchQuery, companies, userRole]);
+
     const handleEdit = useCallback((company) => {
         setEditingCompanyId(company._id);
         setEditedCompany(company);
@@ -103,6 +124,11 @@ const ManageCompanies = () => {
             );
             setEditingCompanyId(null);
             setCompanies((prevCompanies) =>
+                prevCompanies.map((company) =>
+                    company._id === editingCompanyId ? { ...company, ...editedCompany } : company
+                )
+            );
+            setFilteredCompanies((prevCompanies) =>
                 prevCompanies.map((company) =>
                     company._id === editingCompanyId ? { ...company, ...editedCompany } : company
                 )
@@ -142,6 +168,9 @@ const ManageCompanies = () => {
                 }
             );
             setCompanies((prevCompanies) =>
+                prevCompanies.filter((company) => company._id !== deleteCompanyId)
+            );
+            setFilteredCompanies((prevCompanies) =>
                 prevCompanies.filter((company) => company._id !== deleteCompanyId)
             );
             setIsDeleteModalOpen(false);
@@ -247,6 +276,23 @@ const ManageCompanies = () => {
                         </div>
                     )}
 
+                    {/* Search Bar */}
+                    {userRole === 'admin' && (
+                        <div className="mb-6">
+                            <label className="block text-gray-200 font-medium mb-2">Search Companies</label>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Search by Company ID, name, address, or phone"
+                                    className="w-full p-3 pl-10 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
+                                />
+                                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                            </div>
+                        </div>
+                    )}
+
                     {/* Loading Spinner */}
                     {isLoading && (
                         <div className="flex justify-center items-center py-12">
@@ -256,7 +302,7 @@ const ManageCompanies = () => {
 
                     {/* Companies Table */}
                     <div className="overflow-x-auto bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl shadow-lg">
-                        {companies.length === 0 && !isLoading ? (
+                        {filteredCompanies.length === 0 && !isLoading ? (
                             <p className="text-gray-300 p-6 text-center">No companies available.</p>
                         ) : (
                             <table className="w-full text-sm sm:text-base text-left text-gray-200">
@@ -271,7 +317,7 @@ const ManageCompanies = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {companies.map((company) => (
+                                    {filteredCompanies.map((company) => (
                                         <tr
                                             key={company._id}
                                             className="hover:bg-gray-700 hover:bg-opacity-50 border-t border-purple-600 border-opacity-30 transition-all duration-300"
@@ -347,7 +393,7 @@ const ManageCompanies = () => {
                                                             className="px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-300"
                                                             onClick={() => handleEdit(company)}
                                                         >
-                                                            Edit
+                                                            <FaEdit className="w-5 h-5" />
                                                         </button>
                                                     )
                                                 )}
@@ -356,7 +402,7 @@ const ManageCompanies = () => {
                                                         className="px-3 py-1 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-lg hover:from-red-700 hover:to-pink-700 transition-all duration-300"
                                                         onClick={() => handleDelete(company._id)}
                                                     >
-                                                        Delete
+                                                        <FaTrash className="w-5 h-5" />
                                                     </button>
                                                 )}
                                             </td>

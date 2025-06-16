@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
-import { FaSpinner, FaBars, FaHome, FaUser, FaPlus } from 'react-icons/fa';
+import { FaSpinner, FaBars, FaHome, FaUser, FaPlus, FaEdit, FaTrash, FaSearch } from 'react-icons/fa';
 import Sidebar from './Sidebar';
 
 const ManageUsers = () => {
     const [users, setUsers] = useState([]);
+    const [filteredUsers, setFilteredUsers] = useState([]);
     const [editingUserId, setEditingUserId] = useState(null);
     const [editedUser, setEditedUser] = useState({});
     const [isLoading, setIsLoading] = useState(false);
@@ -16,6 +17,7 @@ const ManageUsers = () => {
     const [deleteReason, setDeleteReason] = useState('');
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [userRole, setUserRole] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
     const navigate = useNavigate();
 
     // Close sidebar when clicking outside on mobile
@@ -67,6 +69,7 @@ const ManageUsers = () => {
                     }
                 );
                 setUsers(usersResponse.data);
+                setFilteredUsers(usersResponse.data);
 
                 // Fetch current user's role
                 const userResponse = await axios.get(
@@ -86,6 +89,25 @@ const ManageUsers = () => {
         fetchData();
     }, [navigate]);
 
+    // Filter users based on search query
+    useEffect(() => {
+        if (userRole !== 'admin') {
+            setFilteredUsers(users);
+            return;
+        }
+
+        const filtered = users.filter((user) =>
+            searchQuery
+                ? user.uid.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (user.firstName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (user.lastName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (user.designation || '').toLowerCase().includes(searchQuery.toLowerCase())
+                : true
+        );
+        setFilteredUsers(filtered);
+    }, [searchQuery, users, userRole]);
+
     const handleEdit = useCallback((user) => {
         setEditingUserId(user._id);
         setEditedUser(user);
@@ -103,6 +125,11 @@ const ManageUsers = () => {
             );
             setEditingUserId(null);
             setUsers((prevUsers) =>
+                prevUsers.map((user) =>
+                    user._id === editingUserId ? { ...user, ...editedUser } : user
+                )
+            );
+            setFilteredUsers((prevUsers) =>
                 prevUsers.map((user) =>
                     user._id === editingUserId ? { ...user, ...editedUser } : user
                 )
@@ -142,6 +169,7 @@ const ManageUsers = () => {
                 }
             );
             setUsers((prevUsers) => prevUsers.filter((user) => user._id !== deleteUserId));
+            setFilteredUsers((prevUsers) => prevUsers.filter((user) => user._id !== deleteUserId));
             setIsDeleteModalOpen(false);
             setDeleteReason('');
             setDeleteUserId(null);
@@ -245,6 +273,23 @@ const ManageUsers = () => {
                         </div>
                     )}
 
+                    {/* Search Bar */}
+                    {userRole === 'admin' && (
+                        <div className="mb-6">
+                            <label className="block text-gray-200 font-medium mb-2">Search Users</label>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Search by UID, email, name, or designation"
+                                    className="w-full p-3 pl-10 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
+                                />
+                                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                            </div>
+                        </div>
+                    )}
+
                     {/* Loading Spinner */}
                     {isLoading && (
                         <div className="flex justify-center items-center py-12">
@@ -254,7 +299,7 @@ const ManageUsers = () => {
 
                     {/* Users Table */}
                     <div className="overflow-x-auto bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl shadow-lg">
-                        {users.length === 0 && !isLoading ? (
+                        {filteredUsers.length === 0 && !isLoading ? (
                             <p className="text-gray-300 p-6 text-center">No users available.</p>
                         ) : (
                             <table className="w-full text-sm sm:text-base text-left text-gray-200">
@@ -274,7 +319,7 @@ const ManageUsers = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {users.map((user) => (
+                                    {filteredUsers.map((user) => (
                                         <tr
                                             key={user._id}
                                             className="hover:bg-gray-700 hover:bg-opacity-50 border-t border-purple-600 border-opacity-30 transition-all duration-300"
@@ -419,7 +464,7 @@ const ManageUsers = () => {
                                                         className="px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-300"
                                                         onClick={() => handleEdit(user)}
                                                     >
-                                                        Edit
+                                                        <FaEdit className="w-5 h-5" />
                                                     </button>
                                                 )}
                                                 {userRole === 'admin' && (
@@ -427,7 +472,7 @@ const ManageUsers = () => {
                                                         className="px-3 py-1 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-lg hover:from-red-700 hover:to-pink-700 transition-all duration-300"
                                                         onClick={() => handleDelete(user._id)}
                                                     >
-                                                        Delete
+                                                        <FaTrash className="w-5 h-5" />
                                                     </button>
                                                 )}
                                             </td>

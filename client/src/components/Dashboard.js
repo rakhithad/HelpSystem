@@ -338,7 +338,7 @@ const Dashboard = () => {
                                                         ticket.priority === 'medium' ? 'bg-yellow-500 bg-opacity-20 text-yellow-300' :
                                                         'bg-green-500 bg-opacity-20 text-green-300'
                                                     }`}>
-                                                        {ticket.priority}
+                                                        {ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1)}
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-4 sm:px-6">
@@ -347,7 +347,7 @@ const Dashboard = () => {
                                                         ticket.status === 'in progress' ? 'bg-blue-500 bg-opacity-20 text-blue-300' :
                                                         'bg-gray-500 bg-opacity-20 text-gray-300'
                                                     }`}>
-                                                        {ticket.status}
+                                                        {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1).replace(/-/g, ' ')}
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[150px]">
@@ -357,7 +357,7 @@ const Dashboard = () => {
                                                     {formatDate(ticket.createdAt)}
                                                 </td>
                                                 <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[150px]">
-                                                    {ticket.companyName || 'No Company'}
+                                                    {ticket.companyName || 'Unknown'}
                                                 </td>
                                                 {(userRole === 'admin' || userRole === 'support_engineer') && (
                                                     <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[150px]">
@@ -393,10 +393,9 @@ const Dashboard = () => {
                     <Link
                         to="/dashboard"
                         className="p-3 text-purple-400 hover:text-white transition-colors"
-                    ></Link>
-                    <button>
+                    >
                         <FaHome className="w-5 h-5" />
-                    </button>
+                    </Link>
                     <button
                         onClick={() => navigate('/account')}
                         className="p-3 text-purple-400 hover:text-white transition-colors"

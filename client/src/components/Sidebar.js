@@ -1,8 +1,8 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom'; // Replace Link with NavLink
 import axios from 'axios';
 import { FaTimes, FaBell, FaTicketAlt, FaTachometerAlt, FaUsers, FaBuilding, FaFileAlt, FaStar, FaSignOutAlt } from 'react-icons/fa';
-import logo from '../assets/bannerlogo.png';
+import logo from '../assets/bannerlogo.png'; // Adjust path as needed
 
 const Sidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
     const navigate = useNavigate();
@@ -36,14 +36,18 @@ const Sidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
         }
     }, [token]);
 
+    // Base link classes
     const linkClasses = "flex items-center px-6 py-3 text-gray-200 hover:text-white hover:bg-gradient-to-r hover:from-purple-600 hover:to-pink-600 rounded-xl transition-all duration-300 transform hover:scale-105";
+
+    // Active link classes (applied when the link is active)
+    const activeLinkClasses = `${linkClasses} bg-gradient-to-r from-purple-600 to-pink-600 text-white`;
 
     const navItems = {
         admin: [
             { to: '/notifications', label: 'Notifications', icon: <FaBell className="w-4 h-4 mr-3" /> },
             { to: '/create-ticket', label: 'Create Ticket', icon: <FaTicketAlt className="w-4 h-4 mr-3" /> },
             { to: '/dashboard', label: 'Dashboard', icon: <FaTachometerAlt className="w-4 h-4 mr-3" /> },
-            { to: '/manage-tickets', label: 'Manage Tickets', icon: <FaTicketAlt className="w-4 h-45 mr-3" /> },
+            { to: '/manage-tickets', label: 'Manage Tickets', icon: <FaTicketAlt className="w-4 h-4 mr-3" /> },
             { to: '/manage-users', label: 'Manage Users', icon: <FaUsers className="w-4 h-4 mr-3" /> },
             { to: '/manage-companies', label: 'Manage Companies', icon: <FaBuilding className="w-4 h-4 mr-3" /> },
             { to: '/report', label: 'Report', icon: <FaFileAlt className="w-4 h-4 mr-3" /> },
@@ -97,26 +101,26 @@ const Sidebar = ({ isSidebarOpen, setIsSidebarOpen }) => {
                     <ul className="space-y-2">
                         {(navItems[user?.role] || []).map((item) => (
                             <li key={item.to}>
-                                <Link
+                                <NavLink
                                     to={item.to}
-                                    className={linkClasses}
+                                    className={({ isActive }) => isActive ? activeLinkClasses : linkClasses}
                                     onClick={() => window.innerWidth < 1024 && setIsSidebarOpen(false)}
                                 >
                                     {item.icon}
                                     <span className="font-medium">{item.label}</span>
-                                </Link>
+                                </NavLink>
                             </li>
                         ))}
                         
                         <li>
-                            <Link
+                            <NavLink
                                 to="/view-reviews"
-                                className={linkClasses}
+                                className={({ isActive }) => isActive ? activeLinkClasses : linkClasses}
                                 onClick={() => window.innerWidth < 1024 && setIsSidebarOpen(false)}
                             >
                                 <FaStar className="w-5 h-5 mr-3" />
                                 <span className="font-medium">Reviews</span>
-                            </Link>
+                            </NavLink>
                         </li>
                     </ul>
                 </nav>

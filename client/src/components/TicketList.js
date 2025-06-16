@@ -30,7 +30,20 @@ const TicketList = ({ tickets }) => {
                     <div className="mt-2 text-sm text-white text-opacity-80">
                         <p><strong>Customer:</strong> {ticket.customer.name}</p>
                         <p><strong>Engineer:</strong> {ticket.assignedSupportEngineer?.name || 'Not Assigned'}</p>
-                        <p><strong>Priority:</strong> {ticket.priority}</p>
+                        <p>
+                            <strong>Priority:</strong>{' '}
+                            <span
+                                className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                    ticket.priority === 'high'
+                                        ? 'bg-red-500 bg-opacity-20 text-red-300'
+                                        : ticket.priority === 'medium'
+                                        ? 'bg-yellow-500 bg-opacity-20 text-yellow-300'
+                                        : 'bg-green-500 bg-opacity-20 text-green-300'
+                                }`}
+                            >
+                                {ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1)}
+                            </span>
+                        </p>
                         {ticket.review && (
                             <p><strong>Review:</strong> {ticket.review} (Rating: {ticket.rating} stars)</p>
                         )}
