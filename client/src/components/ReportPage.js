@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import { Link, useNavigate } from 'react-router-dom';
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
-import { FaFilter, FaFileExport, FaChartBar, FaSync, FaBars, FaHome, FaUser, FaSpinner, FaTimes } from 'react-icons/fa';
+import { FaFilter, FaFileExport, FaChartBar, FaSync, FaBars, FaHome, FaUser, FaSpinner, FaTimes, FaSortUp, FaSortDown, FaSort } from 'react-icons/fa';
 import Sidebar from './Sidebar';
 
 const ReportPage = () => {
@@ -40,6 +40,7 @@ const ReportPage = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [selectedTicket, setSelectedTicket] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [sortConfig, setSortConfig] = useState({ key: 'tid', direction: 'asc' });
     const navigate = useNavigate();
 
     // Redirect to login if no token
@@ -253,18 +254,127 @@ const ReportPage = () => {
             priorityCounts
         };
     };
-    
+
     const stats = calculateStats();
+
+    const handleSort = (key) => {
+        let direction = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const sortedTickets = useMemo(() => {
+        const sorted = [...filteredTickets];
+        if (sortConfig.key) {
+            sorted.sort((a, b) => {
+                let aValue, bValue;
+                switch (sortConfig.key) {
+                    case 'tid':
+                        aValue = a.tid;
+                        bValue = b.tid;
+                        break;
+                    case 'title':
+                        aValue = a.title.toLowerCase();
+                        bValue = b.title.toLowerCase();
+                        break;
+                    case 'company':
+                        aValue = a.company?.name?.toLowerCase() || '';
+                        bValue = b.company?.name?.toLowerCase() || '';
+                        break;
+                    case 'engineer':
+                        aValue = a.assignedSupportEngineer?.name?.toLowerCase() || '';
+                        bValue = b.assignedSupportEngineer?.name?.toLowerCase() || '';
+                        break;
+                    case 'createdAt':
+                        aValue = new Date(a.createdAt);
+                        bValue = new Date(b.createdAt);
+                        break;
+                    default:
+                        return 0;
+                }
+                if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        return sorted;
+    }, [filteredTickets, sortConfig]);
 
     const exportToPDF = () => {
         const doc = new jsPDF();
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+
+        // Set default font
+        doc.setFont('helvetica', 'normal');
+
+        // Cover Page
+        doc.setFillColor(99, 102, 241);
+        doc.rect(0, 0, pageWidth, pageHeight, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(30);
+        doc.setFont('helvetica', 'bold');
+        doc.text('HelpDesk Ticket Report', pageWidth / 2, 50, { align: 'center' });
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Generated on: ${new Date().toLocaleString()}`, pageWidth / 2, 70, { align: 'center' });
+        doc.text('HelpDesk System', pageWidth / 2, 90, { align: 'center' });
+        doc.setFontSize(10);
+        doc.text('Confidential - For Internal Use Only', pageWidth / 2, pageHeight - 30, { align: 'center' });
+        doc.addPage();
+
+        // Table of Contents
         doc.setFontSize(18);
         doc.setTextColor(99, 102, 241);
-        doc.text("Ticket Report", doc.internal.pageSize.getWidth() / 2, 15, { align: "center" });
-        doc.setFontSize(10);
-        doc.setTextColor(255, 255, 255);
-        doc.text(`Generated on: ${new Date().toLocaleString()}`, 10, 25);
-        let filterText = "Filters: ";
+        doc.text('Table of Contents', 20, 20);
+        doc.setFontSize(12);
+        doc.setTextColor(0, 0, 0);
+        doc.textWithLink('1. Summary Statistics', 30, 40, { pageNumber: 3 });
+        doc.textWithLink('2. Ticket Details', 30, 50, { pageNumber: 4 });
+        doc.addPage();
+
+        // Summary Statistics
+        doc.setFontSize(18);
+        doc.setTextColor(99, 102, 241);
+        doc.text('Summary Statistics', 20, 20);
+        doc.setFontSize(12);
+        doc.setTextColor(0, 0, 0);
+        let yPos = 30;
+        if (stats.total) {
+            doc.text(`Total Tickets: ${stats.total}`, 30, yPos);
+            yPos += 10;
+            doc.text(`Average Resolution Time: ${stats.avgResolutionTime} hours`, 30, yPos);
+            yPos += 10;
+            doc.text(`Average Customer Satisfaction: ${stats.avgRating}/5`, 30, yPos);
+            yPos += 10;
+            doc.text('Status Distribution:', 30, yPos);
+            yPos += 10;
+            Object.entries(stats.statusCounts || {}).forEach(([status, count]) => {
+                doc.text(`- ${status.charAt(0).toUpperCase() + status.slice(1)}: ${count}`, 40, yPos);
+                yPos += 10;
+            });
+            doc.text('Priority Distribution:', 30, yPos);
+            yPos += 10;
+            Object.entries(stats.priorityCounts || {}).forEach(([priority, count]) => {
+                doc.text(`- ${priority.charAt(0).toUpperCase() + priority.slice(1)}: ${count}`, 40, yPos);
+                yPos += 10;
+            });
+        } else {
+            doc.text('No statistics available.', 30, yPos);
+        }
+        doc.addPage();
+
+        // Ticket Details
+        doc.setFontSize(18);
+        doc.setTextColor(99, 102, 241);
+        doc.text('Ticket Details', 20, 20);
+        doc.setFontSize(12);
+        doc.setTextColor(0, 0, 0);
+
+        // Filter Information
+        let filterText = "Filters Applied: ";
         if (mainFilter === "company" && selectedCompany) {
             const company = uniqueCompanies.find(c => c.companyId === selectedCompany);
             filterText += `Company: ${company?.name || "Unknown"}, `;
@@ -277,43 +387,75 @@ const ReportPage = () => {
         if (dateRange.startDate && dateRange.endDate) {
             filterText += `Date: ${dateRange.startDate} to ${dateRange.endDate}, `;
         }
-        filterText = filterText === "Filters: " ? "No filters applied" : filterText.slice(0, -2);
-        doc.text(filterText, 10, 30);
-        if (stats.total) {
-            doc.text(`Total Tickets: ${stats.total}`, 10, 35);
-            doc.text(`Avg. Resolution Time: ${stats.avgResolutionTime} hours`, 10, 40);
-            doc.text(`Avg. Customer Satisfaction: ${stats.avgRating}/5`, 10, 45);
-        }
+        filterText = filterText === "Filters Applied: " ? "No filters applied" : filterText.slice(0, -2);
+        doc.text(filterText, 20, 30);
+
+        // Ticket Table
         const columns = [
-            { header: "ID", dataKey: "tid" },
-            { header: "Title", dataKey: "title" },
-            { header: "Company", dataKey: "company" },
-            { header: "Engineer", dataKey: "engineer" },
-            { header: "Created", dataKey: "createdAt" }
+            { header: 'ID', dataKey: 'tid' },
+            { header: 'Title', dataKey: 'title' },
+            { header: 'Company', dataKey: 'company' },
+            { header: 'Engineer', dataKey: 'engineer' },
+            { header: 'Customer', dataKey: 'customer' },
+            { header: 'Status', dataKey: 'status' },
+            { header: 'Priority', dataKey: 'priority' },
+            { header: 'Created', dataKey: 'createdAt' },
+            { header: 'Review', dataKey: 'review' },
+            { header: 'Rating', dataKey: 'rating' }
         ];
         const rows = filteredTickets.map(ticket => ({
             tid: ticket.tid,
             title: ticket.title,
-            company: ticket.company?.name || "No Company",
-            engineer: ticket.assignedSupportEngineer?.name || "Not Assigned",
-            createdAt: new Date(ticket.createdAt).toLocaleDateString()
+            company: ticket.company?.name || 'No Company',
+            engineer: ticket.assignedSupportEngineer?.name || 'Not Assigned',
+            customer: ticket.customer?.name || 'Unknown',
+            status: ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1),
+            priority: ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1),
+            createdAt: new Date(ticket.createdAt).toLocaleDateString(),
+            review: ticket.review || 'No Review',
+            rating: ticket.rating ? `${ticket.rating}/5` : 'N/A'
         }));
+
         autoTable(doc, {
             head: [columns.map(col => col.header)],
             body: rows.map(row => columns.map(col => row[col.dataKey])),
-            startY: 50,
-            styles: { overflow: 'linebreak', fontSize: 8, textColor: [255, 255, 255], fillColor: [31, 41, 55] },
-            headStyles: { fillColor: [99, 102, 241], textColor: [255, 255, 255] },
+            startY: 40,
+            styles: {
+                overflow: 'linebreak',
+                fontSize: 8,
+                textColor: [0, 0, 0],
+                fillColor: [255, 255, 255],
+                lineColor: [200, 200, 200],
+                lineWidth: 0.1
+            },
+            headStyles: {
+                fillColor: [99, 102, 241],
+                textColor: [255, 255, 255],
+                fontStyle: 'bold'
+            },
             columnStyles: {
-                tid: { cellWidth: 20 },
-                title: { cellWidth: 50 },
-                company: { cellWidth: 40 },
-                engineer: { cellWidth: 40 },
-                createdAt: { cellWidth: 30 }
+                tid: { cellWidth: 15 },
+                title: { cellWidth: 30 },
+                company: { cellWidth: 25 },
+                engineer: { cellWidth: 25 },
+                customer: { cellWidth: 25 },
+                status: { cellWidth: 20 },
+                priority: { cellWidth: 20 },
+                createdAt: { cellWidth: 20 },
+                review: { cellWidth: 30 },
+                rating: { cellWidth: 15 }
             },
             theme: 'grid',
-            alternateRowStyles: { fillColor: [55, 65, 81] }
+            alternateRowStyles: { fillColor: [240, 240, 240] },
+            didDrawPage: (data) => {
+                // Footer
+                doc.setFontSize(8);
+                doc.setTextColor(100);
+                doc.text(`Page ${data.pageNumber}`, pageWidth - 20, pageHeight - 10, { align: 'right' });
+                doc.text('HelpDesk System', 20, pageHeight - 10);
+            }
         });
+
         doc.save("ticket_report.pdf");
     };
 
@@ -353,6 +495,15 @@ const ReportPage = () => {
         }
     };
 
+    const getSortIcon = (key) => {
+        if (sortConfig.key !== key) return <FaSort className="inline ml-1 w-4 h-4" />;
+        return sortConfig.direction === 'asc' ? (
+            <FaSortUp className="inline ml-1 w-4 h-4" />
+        ) : (
+            <FaSortDown className="inline ml-1 w-4 h-4" />
+        );
+    };
+
     return (
         <div className="flex min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-blue-900 text-white overflow-hidden">
             <Sidebar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
@@ -363,44 +514,60 @@ const ReportPage = () => {
                 />
             )}
             <div className="flex-1 pb-20 overflow-y-auto lg:ml-72">
-                <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
+                <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
                     <div className="mb-8">
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                             <h1 className="text-2xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 animate-pulse">
                                 Ticket Report
                             </h1>
-                            <div className="flex flex-wrap gap-3 mt-4 sm:mt-0">
+                            <div className="flex flex-wrap gap-3">
                                 <button
                                     onClick={() => setShowFilters(!showFilters)}
-                                    className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 flex items-center"
+                                    className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 transition-all duration-300 flex items-center relative group"
+                                    title="Toggle Filters"
                                 >
                                     <FaFilter className="mr-2 w-4 h-4" />
                                     {showFilters ? 'Hide Filters' : 'Show Filters'}
+                                    <span className="absolute hidden group-hover:block -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2">
+                                        Toggle Filters
+                                    </span>
                                 </button>
                                 <button
                                     onClick={() => setShowStats(!showStats)}
-                                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 flex items-center"
+                                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 flex items-center relative group"
+                                    title="Toggle Statistics"
                                 >
                                     <FaChartBar className="mr-2 w-4 h-4" />
                                     {showStats ? 'Hide Stats' : 'Show Stats'}
+                                    <span className="absolute hidden group-hover:block -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2">
+                                        Toggle Statistics
+                                    </span>
                                 </button>
                                 <button
                                     onClick={exportToPDF}
-                                    className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all duration-300 flex items-center"
+                                    className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all duration-300 flex items-center relative group"
+                                    title="Export to PDF"
                                 >
                                     <FaFileExport className="mr-2 w-4 h-4" />
                                     Export PDF
+                                    <span className="absolute hidden group-hover:block -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2">
+                                        Export to PDF
+                                    </span>
                                 </button>
                                 <button
                                     onClick={() => {
                                         fetchReportData();
                                         resetFilters();
                                     }}
-                                    className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all duration-300 flex items-center"
+                                    className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all duration-300 flex items-center relative group"
                                     disabled={isLoading}
+                                    title="Refresh Data"
                                 >
                                     <FaSync className={`mr-2 w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
                                     Refresh
+                                    <span className="absolute hidden group-hover:block -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2">
+                                        Refresh Data
+                                    </span>
                                 </button>
                             </div>
                         </div>
@@ -427,276 +594,306 @@ const ReportPage = () => {
                             <FaSpinner className="animate-spin h-8 w-8 text-purple-400" />
                         </div>
                     )}
-                    {showStats && (
-                        <div className="bg-gray-800 bg-opacity-70 backdrop-blur-md p-4 sm:p-6 rounded-xl shadow-lg mb-6">
-                            <h2 className="text-xl font-semibold text-gray-200 mb-4">Report Statistics</h2>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 rounded-xl">
-                                    <div className="text-sm text-gray-300">Total Tickets</div>
-                                    <div className="text-2xl font-bold text-white">{stats.total || 0}</div>
-                                </div>
-                                <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 rounded-xl">
-                                    <div className="text-sm text-gray-300">Avg. Resolution Time</div>
-                                    <div className="text-2xl font-bold text-white">{stats.avgResolutionTime || 0} hours</div>
-                                </div>
-                                <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 rounded-xl">
-                                    <div className="text-sm text-gray-300">Customer Satisfaction</div>
-                                    <div className="text-2xl font-bold text-white">{stats.avgRating || 0}/5</div>
-                                </div>
-                                <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 rounded-xl">
-                                    <div className="text-sm text-gray-300">Open Tickets</div>
-                                    <div className="text-2xl font-bold text-white">{stats.statusCounts?.open || 0}</div>
-                                </div>
-                            </div>
-                            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="bg-gray-900 bg-opacity-50 p-4 rounded-xl">
-                                    <h3 className="text-md font-semibold text-gray-200 mb-2">Status Distribution</h3>
-                                    <div className="space-y-2">
-                                        {Object.entries(stats.statusCounts || {}).map(([status, count]) => (
-                                            <div key={status} className="flex items-center">
-                                                <div className="w-24 text-sm text-gray-300">
-                                                    {status.charAt(0).toUpperCase() + status.slice(1)}
-                                                </div>
-                                                <div className="flex-1 bg-gray-700 h-4 rounded-full overflow-hidden">
-                                                    <div 
-                                                        className="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full" 
-                                                        style={{ width: `${stats.total ? (count / stats.total) * 100 : 0}%` }}
-                                                    ></div>
-                                                </div>
-                                                <div className="w-12 text-right text-sm text-gray-300">{count}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="bg-gray-900 bg-opacity-50 p-4 rounded-xl">
-                                    <h3 className="text-md font-semibold text-gray-200 mb-2">Priority Distribution</h3>
-                                    <div className="space-y-2">
-                                        {Object.entries(stats.priorityCounts || {}).map(([priority, count]) => (
-                                            <div key={priority} className="flex items-center">
-                                                <div className="w-24 text-sm text-gray-300">
-                                                    {priority.charAt(0).toUpperCase() + priority.slice(1)}
-                                                </div>
-                                                <div className="flex-1 bg-gray-700 h-4 rounded-full overflow-hidden">
-                                                    <div 
-                                                        className={`h-full rounded-full ${getPriorityColor(priority)}`} 
-                                                        style={{ width: `${stats.total ? (count / stats.total) * 100 : 0}%` }}
-                                                    ></div>
-                                                </div>
-                                                <div className="w-12 text-right text-sm text-gray-300">{count}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    {showFilters && (
-                        <div className="bg-gray-800 bg-opacity-70 backdrop-blur-md p-4 sm:p-6 rounded-xl shadow-lg mb-6">
-                            <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-xl font-semibold text-gray-200">Filter Options</h2>
-                                <button 
-                                    onClick={resetFilters}
-                                    className="text-purple-300 hover:text-white text-sm font-medium"
-                                >
-                                    Reset All Filters
-                                </button>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-200 mb-1">Main Filter</label>
-                                    <select
-                                        value={mainFilter}
-                                        onChange={(e) => handleMainFilterChange(e.target.value)}
-                                        className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                    >
-                                        <option value="all">All Tickets</option>
-                                        <option value="company">Filter by Company</option>
-                                        <option value="engineer">Filter by Support Engineer</option>
-                                    </select>
-                                </div>
-                                {mainFilter === "company" && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-200 mb-1">Select Company</label>
-                                        <select
-                                            value={selectedCompany}
-                                            onChange={(e) => handleCompanyChange(e.target.value)}
-                                            className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                        >
-                                            <option value="">Select a Company</option>
-                                            {uniqueCompanies.map(company => (
-                                                <option key={company.companyId} value={company.companyId}>
-                                                    {company.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
-                                {mainFilter === "engineer" && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-200 mb-1">Select Engineer</label>
-                                        <select
-                                            value={selectedEngineer}
-                                            onChange={(e) => handleEngineerChange(e.target.value)}
-                                            className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                        >
-                                            <option value="">Select an Engineer</option>
-                                            {uniqueEngineers.map(engineer => (
-                                                <option key={engineer} value={engineer}>
-                                                    {engineer}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-200 mb-1">Start Date</label>
-                                    <input
-                                        type="date"
-                                        value={dateRange.startDate}
-                                        onChange={(e) => handleCustomDateChange("startDate", e.target.value)}
-                                        className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-200 mb-1">End Date</label>
-                                    <input
-                                        type="date"
-                                        value={dateRange.endDate}
-                                        onChange={(e) => handleCustomDateChange("endDate", e.target.value)}
-                                        className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-200 mb-1">Ticket Status</label>
-                                    <select
-                                        value={selectedFilters.status}
-                                        onChange={(e) => handleFilterChange('status', e.target.value)}
-                                        className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                    >
-                                        <option value="">All Statuses</option>
-                                        {Object.entries(metrics.ticketsByStatus || {}).map(([status, count]) => (
-                                            <option key={status} value={status}>
-                                                {status.charAt(0).toUpperCase() + status.slice(1)} ({count})
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-200 mb-1">Support Engineer</label>
-                                    <select
-                                        value={selectedFilters.engineer}
-                                        onChange={(e) => handleFilterChange('engineer', e.target.value)}
-                                        className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                    >
-                                        <option value="">All Engineers</option>
-                                        {uniqueEngineers.map(engineer => (
-                                            <option key={engineer} value={engineer}>
-                                                {engineer} ({metrics.ticketsByEngineer?.[engineer] || 0})
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-200 mb-1">Customer</label>
-                                    <select
-                                        value={selectedFilters.customer}
-                                        onChange={(e) => handleFilterChange('customer', e.target.value)}
-                                        className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                    >
-                                        <option value="">All Customers</option>
-                                        {Object.entries(metrics.ticketsByCustomer || {}).map(([customer, count]) => (
-                                            <option key={customer} value={customer}>
-                                                {customer} ({count})
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-200 mb-1">Priority Level</label>
-                                    <select
-                                        value={selectedFilters.priority}
-                                        onChange={(e) => handleFilterChange('priority', e.target.value)}
-                                        className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                    >
-                                        <option value="">All Priorities</option>
-                                        <option value="low">Low</option>
-                                        <option value="medium">Medium</option>
-                                        <option value="high">High</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-200 mb-1">Customer Rating</label>
-                                    <select
-                                        value={selectedFilters.rating}
-                                        onChange={(e) => handleFilterChange('rating', e.target.value)}
-                                        className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
-                                    >
-                                        <option value="">All Ratings</option>
-                                        {[1, 2, 3, 4, 5].map(rating => (
-                                            <option key={rating} value={rating}>
-                                                {rating} Star{rating > 1 ? 's' : ''}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                     {!isLoading && (
-                        <div className="overflow-x-auto bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl shadow-lg">
-                            {metrics.reportData.length === 0 ? (
-                                <p className="text-gray-300 p-6 text-center">No tickets available.</p>
-                            ) : filteredTickets.length > 0 ? (
-                                <table className="w-full text-sm sm:text-base text-left text-gray-200">
-                                    <thead className="bg-gray-900 bg-opacity-50">
-                                        <tr>
-                                            <th className="px-4 py-3 sm:px-6">ID</th>
-                                            <th className="px-4 py-3 sm:px-6">Title</th>
-                                            <th className="px-4 py-3 sm:px-6">Company</th>
-                                            <th className="px-4 py-3 sm:px-6">Engineer</th>
-                                            <th className="px-4 py-3 sm:px-6">Created</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {filteredTickets.map((ticket) => (
-                                            <tr
-                                                key={ticket._id}
-                                                className="hover:bg-gray-700 hover:bg-opacity-50 border-t border-purple-600 border-opacity-30 transition-all duration-300 cursor-pointer"
-                                                onClick={() => openTicketModal(ticket)}
-                                                role="button"
-                                                tabIndex={0}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter' || e.key === ' ') {
-                                                        e.preventDefault();
-                                                        openTicketModal(ticket);
-                                                    }
-                                                }}
-                                            >
-                                                <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[150px]">
-                                                    {ticket.tid}
-                                                </td>
-                                                <td className="px-4 py-4 sm:px-6 truncate max-w-[150px] sm:max-w-[200px]">
-                                                    {ticket.title}
-                                                </td>
-                                                <td className="px-4 py-4 sm:px-6 truncate max-w-[150px] sm:max-w-[200px]">
-                                                    {ticket.company?.name || 'No Company'}
-                                                </td>
-                                                <td className="px-4 py-4 sm:px-6 truncate max-w-[150px] sm:max-w-[200px]">
-                                                    {ticket.assignedSupportEngineer?.name || 'Not Assigned'}
-                                                </td>
-                                                <td className="px-4 py-4 sm:px-6">
-                                                    {new Date(ticket.createdAt).toLocaleDateString()}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            ) : (
-                                <div className="text-gray-300 text-center py-8">
-                                    No tickets match the selected filters.
+                        <>
+                            <div className="bg-gray-800 bg-opacity-70 backdrop-blur-md p-4 sm:p-6 rounded-xl shadow-lg mb-6">
+                                <h2 className="text-xl font-semibold text-gray-200 mb-4">Summary</h2>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 rounded-xl text-center">
+                                        <div className="text-sm text-gray-300">Total Tickets</div>
+                                        <div className="text-2xl font-bold text-white">{stats.total || 0}</div>
+                                    </div>
+                                    <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 rounded-xl text-center">
+                                        <div className="text-sm text-gray-300">Avg. Resolution Time</div>
+                                        <div className="text-2xl font-bold text-white">{stats.avgResolutionTime || 0} hrs</div>
+                                    </div>
+                                    <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 rounded-xl text-center">
+                                        <div className="text-sm text-gray-300">Avg. Rating</div>
+                                        <div className="text-2xl font-bold text-white">{stats.avgRating || 0}/5</div>
+                                    </div>
+                                    <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 rounded-xl text-center">
+                                        <div className="text-sm text-gray-300">Open Tickets</div>
+                                        <div className="text-2xl font-bold text-white">{stats.statusCounts?.open || 0}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            {showStats && (
+                                <div className="bg-gray-800 bg-opacity-70 backdrop-blur-md p-4 sm:p-6 rounded-xl shadow-lg mb-6">
+                                    <h2 className="text-xl font-semibold text-gray-200 mb-4">Detailed Statistics</h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="bg-gray-900 bg-opacity-50 p-4 rounded-xl">
+                                            <h3 className="text-md font-semibold text-gray-200 mb-2">Status Distribution</h3>
+                                            <div className="space-y-2">
+                                                {Object.entries(stats.statusCounts || {}).map(([status, count]) => (
+                                                    <div key={status} className="flex items-center">
+                                                        <div className="w-24 text-sm text-gray-300">
+                                                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                                                        </div>
+                                                        <div className="flex-1 bg-gray-700 h-4 rounded-full overflow-hidden">
+                                                            <div 
+                                                                className="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full" 
+                                                                style={{ width: `${stats.total ? (count / stats.total) * 100 : 0}%` }}
+                                                            ></div>
+                                                        </div>
+                                                        <div className="w-12 text-right text-sm text-gray-300">{count}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="bg-gray-900 bg-opacity-50 p-4 rounded-xl">
+                                            <h3 className="text-md font-semibold text-gray-200 mb-2">Priority Distribution</h3>
+                                            <div className="space-y-2">
+                                                {Object.entries(stats.priorityCounts || {}).map(([priority, count]) => (
+                                                    <div key={priority} className="flex items-center">
+                                                        <div className="w-24 text-sm text-gray-300">
+                                                            {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                                                        </div>
+                                                        <div className="flex-1 bg-gray-700 h-4 rounded-full overflow-hidden">
+                                                            <div 
+                                                                className={`h-full rounded-full ${getPriorityColor(priority)}`} 
+                                                                style={{ width: `${stats.total ? (count / stats.total) * 100 : 0}%` }}
+                                                            ></div>
+                                                        </div>
+                                                        <div className="w-12 text-right text-sm text-gray-300">{count}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
-                        </div>
+                            {showFilters && (
+                                <div className="bg-gray-800 bg-opacity-70 backdrop-blur-md p-4 sm:p-6 rounded-xl shadow-lg mb-6">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h2 className="text-xl font-semibold text-gray-200">Filter Options</h2>
+                                        <button 
+                                            onClick={resetFilters}
+                                            className="text-purple-300 hover:text-white text-sm font-medium hover:underline"
+                                        >
+                                            Reset All Filters
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-200 mb-1">Main Filter</label>
+                                            <select
+                                                value={mainFilter}
+                                                onChange={(e) => handleMainFilterChange(e.target.value)}
+                                                className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
+                                            >
+                                                <option value="all">All Tickets</option>
+                                                <option value="company">Filter by Company</option>
+                                                <option value="engineer">Filter by Support Engineer</option>
+                                            </select>
+                                        </div>
+                                        {mainFilter === "company" && (
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-200 mb-1">Select Company</label>
+                                                <select
+                                                    value={selectedCompany}
+                                                    onChange={(e) => handleCompanyChange(e.target.value)}
+                                                    className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
+                                                >
+                                                    <option value="">Select a Company</option>
+                                                    {uniqueCompanies.map(company => (
+                                                        <option key={company.companyId} value={company.companyId}>
+                                                            {company.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
+                                        {mainFilter === "engineer" && (
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-200 mb-1">Select Engineer</label>
+                                                <select
+                                                    value={selectedEngineer}
+                                                    onChange={(e) => handleEngineerChange(e.target.value)}
+                                                    className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
+                                                >
+                                                    <option value="">Select an Engineer</option>
+                                                    {uniqueEngineers.map(engineer => (
+                                                        <option key={engineer} value={engineer}>
+                                                            {engineer}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-200 mb-1">Start Date</label>
+                                            <input
+                                                type="date"
+                                                value={dateRange.startDate}
+                                                onChange={(e) => handleCustomDateChange("startDate", e.target.value)}
+                                                className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-200 mb-1">End Date</label>
+                                            <input
+                                                type="date"
+                                                value={dateRange.endDate}
+                                                onChange={(e) => handleCustomDateChange("endDate", e.target.value)}
+                                                className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-200 mb-1">Ticket Status</label>
+                                            <select
+                                                value={selectedFilters.status}
+                                                onChange={(e) => handleFilterChange('status', e.target.value)}
+                                                className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
+                                            >
+                                                <option value="">All Statuses</option>
+                                                {Object.entries(metrics.ticketsByStatus || {}).map(([status, count]) => (
+                                                    <option key={status} value={status}>
+                                                        {status.charAt(0).toUpperCase() + status.slice(1)} ({count})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-200 mb-1">Support Engineer</label>
+                                            <select
+                                                value={selectedFilters.engineer}
+                                                onChange={(e) => handleFilterChange('engineer', e.target.value)}
+                                                className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
+                                            >
+                                                <option value="">All Engineers</option>
+                                                {uniqueEngineers.map(engineer => (
+                                                    <option key={engineer} value={engineer}>
+                                                        {engineer} ({metrics.ticketsByEngineer?.[engineer] || 0})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-200 mb-1">Customer</label>
+                                            <select
+                                                value={selectedFilters.customer}
+                                                onChange={(e) => handleFilterChange('customer', e.target.value)}
+                                                className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
+                                            >
+                                                <option value="">All Customers</option>
+                                                {Object.entries(metrics.ticketsByCustomer || {}).map(([customer, count]) => (
+                                                    <option key={customer} value={customer}>
+                                                        {customer} ({count})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-200 mb-1">Priority Level</label>
+                                            <select
+                                                value={selectedFilters.priority}
+                                                onChange={(e) => handleFilterChange('priority', e.target.value)}
+                                                className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
+                                            >
+                                                <option value="">All Priorities</option>
+                                                <option value="low">Low</option>
+                                                <option value="medium">Medium</option>
+                                                <option value="high">High</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-200 mb-1">Customer Rating</label>
+                                            <select
+                                                value={selectedFilters.rating}
+                                                onChange={(e) => handleFilterChange('rating', e.target.value)}
+                                                className="w-full p-2 rounded-lg bg-gray-900 bg-opacity-50 backdrop-blur-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-600 border-opacity-30 transition-all duration-300"
+                                            >
+                                                <option value="">All Ratings</option>
+                                                {[1, 2, 3, 4, 5].map(rating => (
+                                                    <option key={rating} value={rating}>
+                                                        {rating} Star{rating > 1 ? 's' : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            <div className="overflow-x-auto bg-gray-800 bg-opacity-70 backdrop-blur-md rounded-xl shadow-lg">
+                                {metrics.reportData.length === 0 ? (
+                                    <p className="text-gray-300 p-6 text-center">No tickets available.</p>
+                                ) : sortedTickets.length > 0 ? (
+                                    <table className="w-full text-sm sm:text-base text-left text-gray-200">
+                                        <thead className="bg-gray-900 bg-opacity-50">
+                                            <tr>
+                                                <th 
+                                                    className="px-4 py-3 sm:px-6 cursor-pointer hover:text-purple-300"
+                                                    onClick={() => handleSort('tid')}
+                                                >
+                                                    ID {getSortIcon('tid')}
+                                                </th>
+                                                <th 
+                                                    className="px-4 py-3 sm:px-6 cursor-pointer hover:text-purple-300"
+                                                    onClick={() => handleSort('title')}
+                                                >
+                                                    Title {getSortIcon('title')}
+                                                </th>
+                                                <th 
+                                                    className="px-4 py-3 sm:px-6 cursor-pointer hover:text-purple-300"
+                                                    onClick={() => handleSort('company')}
+                                                >
+                                                    Company {getSortIcon('company')}
+                                                </th>
+                                                <th 
+                                                    className="px-4 py-3 sm:px-6 cursor-pointer hover:text-purple-300"
+                                                    onClick={() => handleSort('engineer')}
+                                                >
+                                                    Engineer {getSortIcon('engineer')}
+                                                </th>
+                                                <th 
+                                                    className="px-4 py-3 sm:px-6 cursor-pointer hover:text-purple-300"
+                                                    onClick={() => handleSort('createdAt')}
+                                                >
+                                                    Created {getSortIcon('createdAt')}
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {sortedTickets.map((ticket) => (
+                                                <tr
+                                                    key={ticket._id}
+                                                    className="hover:bg-gray-700 hover:bg-opacity-50 border-t border-purple-600 border-opacity-30 transition-all duration-300 cursor-pointer"
+                                                    onClick={() => openTicketModal(ticket)}
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' || e.key === ' ') {
+                                                            e.preventDefault();
+                                                            openTicketModal(ticket);
+                                                        }
+                                                    }}
+                                                >
+                                                    <td className="px-4 py-4 sm:px-6 truncate max-w-[100px] sm:max-w-[150px]">
+                                                        {ticket.tid}
+                                                    </td>
+                                                    <td className="px-4 py-4 sm:px-6 truncate max-w-[150px] sm:max-w-[200px]">
+                                                        {ticket.title}
+                                                    </td>
+                                                    <td className="px-4 py-4 sm:px-6 truncate max-w-[150px] sm:max-w-[200px]">
+                                                        {ticket.company?.name || 'No Company'}
+                                                    </td>
+                                                    <td className="px-4 py-4 sm:px-6 truncate max-w-[150px] sm:max-w-[200px]">
+                                                        {ticket.assignedSupportEngineer?.name || 'Not Assigned'}
+                                                    </td>
+                                                    <td className="px-4 py-4 sm:px-6">
+                                                        {new Date(ticket.createdAt).toLocaleDateString()}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                ) : (
+                                    <div className="text-gray-300 text-center py-8">
+                                        No tickets match the selected filters.
+                                    </div>
+                                )}
+                            </div>
+                        </>
                     )}
                     {isModalOpen && selectedTicket && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
